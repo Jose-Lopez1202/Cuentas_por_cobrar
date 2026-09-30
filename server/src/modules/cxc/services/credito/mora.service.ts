@@ -48,3 +48,7 @@ export async function remove(id: number) {
   await getOne(id);
   await repository.remove(id);
 }
+
+export async function recalcular() {
+  return repository.recalcularPendientes();
+}

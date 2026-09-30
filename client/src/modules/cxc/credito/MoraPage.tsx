@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, RefreshCw } from 'lucide-react';
 import {
   DataTable,
   StatusBadge,
@@ -29,6 +29,8 @@ export const MoraPage = () => {
     useState<Mora | null>(null);
 
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isRecalculando, setIsRecalculando] = useState(false);
+  const [recalculoMensaje, setRecalculoMensaje] = useState<string | null>(null);
 
   const { data, meta, isLoading, error, refetch } =
     usePaginatedList<Mora>(
@@ -39,6 +41,22 @@ export const MoraPage = () => {
         search,
       },
     );
+
+  const handleRecalcular = async () => {
+    setIsRecalculando(true);
+    setRecalculoMensaje(null);
+    try {
+      const resultado = await apiClient.post<{ activas: number; cerradas: number }>('/cxc/mora/recalcular', {});
+      setRecalculoMensaje(
+        `Recalculado: ${resultado.activas} en mora activa, ${resultado.cerradas} cerradas por saldo pagado.`,
+      );
+      refetch();
+    } catch (err) {
+      setRecalculoMensaje(err instanceof ApiError ? err.message : 'No se pudo recalcular la mora');
+    } finally {
+      setIsRecalculando(false);
+    }
+  };
 
   const handleDelete = async () => {
     if (!moraAEliminar) return;
@@ -74,17 +92,33 @@ export const MoraPage = () => {
           </p>
         </div>
 
-        <Button
-          icon={Plus}
-          onClick={() =>
-            setModalState({
-              mode: 'create',
-            })
-          }
-        >
-          Nueva Mora
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="secondary"
+            icon={RefreshCw}
+            onClick={handleRecalcular}
+            disabled={isRecalculando}
+          >
+            {isRecalculando ? 'Recalculando...' : 'Recalcular Mora'}
+          </Button>
+          <Button
+            icon={Plus}
+            onClick={() =>
+              setModalState({
+                mode: 'create',
+              })
+            }
+          >
+            Nueva Mora
+          </Button>
+        </div>
       </div>
+
+      {recalculoMensaje && (
+        <p className="text-sm text-blue-700 font-medium bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
+          {recalculoMensaje}
+        </p>
+      )}
 
       <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
         <TextInput

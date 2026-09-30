@@ -1,17 +1,30 @@
 import {
   createDocumentoSchema,
   updateDocumentoSchema,
+  anularDocumentoSchema,
   buildPaginationMeta,
   type Documento,
   type PaginatedResponse,
 } from '@erp/contracts';
+import { businessTodayIso } from '../../../../shared/date';
 import { BadRequestError, ConflictError, NotFoundError } from '../../../../shared/errors/AppError';
 export { NotFoundError };
 import * as documentoRepository from '../../repositories/documentos/documento.repository';
 import * as catalogosRepository from '../../repositories/documentos/catalogosDocumentos.repository';
+import * as condicionCreditoRepository from '../../repositories/credito/condicionCredito.repository';
+import * as sharedCatalogosRepository from '../../repositories/catalogos.repository';
+import { hasFinancialMovement as hasMovement, isDocumentoBloqueadoParaAplicacion } from '../../shared/financialRules';
 
-const hasFinancialMovement = (documento: Documento) =>
-  Math.abs(Number(documento.total) - Number(documento.saldo)) > 0.005;
+const hasFinancialMovement = (documento: Documento) => hasMovement(documento.total, documento.saldo);
+
+async function assertCondicionCreditoActiva(idCondicionCredito: number | null | undefined) {
+  if (!idCondicionCredito) return;
+  const condicion = await condicionCreditoRepository.findById(idCondicionCredito);
+  if (!condicion) throw new BadRequestError('La condición de crédito seleccionada no existe');
+  if (condicion.estado !== 'A') {
+    throw new BadRequestError('La condición de crédito seleccionada está inactiva');
+  }
+}
 
 export async function listDocumentos(query: {
   page?: string;
@@ -39,6 +52,7 @@ export async function getDocumento(id: number): Promise<Documento> {
 
 export async function createDocumento(rawInput: unknown): Promise<Documento> {
   const input = createDocumentoSchema.parse(rawInput);
+  await assertCondicionCreditoActiva(input.idCondicionCredito);
 
   // NIT_CLIENTE es una fotografía del dato maestro al momento de crear.
   // El saldo siempre inicia igual al total y el estado en PENDIENTE.
@@ -55,9 +69,9 @@ export async function createDocumento(rawInput: unknown): Promise<Documento> {
 export async function updateDocumento(id: number, rawInput: unknown): Promise<Documento> {
   const current = await getDocumento(id);
   const input = updateDocumentoSchema.parse(rawInput);
+  await assertCondicionCreditoActiva(input.idCondicionCredito);
 
-  const estadoActual = String(current.estado).toUpperCase();
-  if (['PAGADO', 'PAGADA', 'ANULADO', 'ANULADA'].includes(estadoActual)) {
+  if (isDocumentoBloqueadoParaAplicacion(current.estado)) {
     throw new ConflictError('Un documento pagado o anulado no puede editarse desde el CRUD.');
   }
 
@@ -108,4 +122,22 @@ export async function deleteDocumento(id: number): Promise<void> {
   }
 
   await documentoRepository.remove(id);
+}
+
+export async function anularDocumento(id: number, rawInput: unknown): Promise<Documento> {
+  if (!Number.isInteger(id) || id <= 0) throw new BadRequestError('ID de documento inválido');
+  const input = anularDocumentoSchema.parse(rawInput);
+  if (input.fechaAnulacion && input.fechaAnulacion > businessTodayIso()) {
+    throw new BadRequestError('La fecha de anulación no puede ser futura');
+  }
+  if (!(await sharedCatalogosRepository.empleadoExiste(input.idEmpleadoAnulacion))) {
+    throw new BadRequestError('El empleado seleccionado no existe');
+  }
+
+  // repository.anular() perdona el saldo restante y bloquea contra
+  // PAGADO/ANULADO bajo FOR UPDATE. No toca pagos/NC/anticipos ya aplicados:
+  // esos mantienen su validez histórica; para deshacer uno específico se usa
+  // su propio reversar().
+  await documentoRepository.anular(id, input);
+  return getDocumento(id);
 }

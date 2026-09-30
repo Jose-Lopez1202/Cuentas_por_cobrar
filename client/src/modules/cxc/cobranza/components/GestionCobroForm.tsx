@@ -114,6 +114,11 @@ export const GestionCobroForm = ({ gestion, onSuccess, onCancel }: GestionCobroF
         <TextInput label="Fecha compromiso" type="date" min={todayIso()} value={fechaCompromiso} onChange={(e: any) => setFechaCompromiso(e.target.value)} error={errors.fechaCompromiso} helperText="Solo si existe compromiso; no puede ser anterior a hoy." />
         <TextInput label="Monto comprometido" type="number" restriction="decimal" decimalPlaces={2} step="0.01" min="0.01" value={montoCompromiso} onChange={(e: any) => setMontoCompromiso(e.target.value)} error={errors.montoCompromiso} helperText="Monto prometido, mayor a 0 y con máximo 2 decimales." />
       </div>
+      {!isEditing && fechaCompromiso && montoCompromiso && (
+        <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+          Al guardar se creará automáticamente una Promesa de Pago vinculada a esta gestión, con esta fecha y monto.
+        </p>
+      )}
       {formError && <p role="alert" className="text-sm text-red-600 font-medium bg-red-50 border border-red-200 rounded-lg px-3 py-2">{formError}</p>}
       <FormActionButtons onCancel={onCancel} isSubmitting={isSubmitting} isEditing={isEditing} createLabel="Crear gestión" isFormValid={isFormValid} />
     </form>

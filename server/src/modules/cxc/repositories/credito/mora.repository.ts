@@ -5,6 +5,7 @@ import type {
   CreateMoraInput,
   UpdateMoraInput,
 } from '@erp/contracts';
+import { roundMoney } from '../../shared/financialRules';
 
 interface MoraRow {
   ID_MORA: number;
@@ -267,6 +268,110 @@ export async function remove(
     );
 
     await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    await conn.close();
+  }
+}
+
+export interface ResultadoRecalculoMora {
+  activas: number;
+  cerradas: number;
+}
+
+/**
+ * Recalcula la mora de todos los documentos con una CXC_CONDICIONES_CREDITO
+ * asignada. Es una acción manual (botón "Recalcular mora"), no un job
+ * programado: este proyecto no usa PL/SQL ni tiene infraestructura de cron,
+ * así que el disparo es explícito por diseño, no una limitación olvidada.
+ *
+ * Reglas:
+ * - Un documento sin ID_CONDICION_CREDITO nunca genera mora automática
+ *   (puede seguir registrándose a mano como antes).
+ * - Días de mora = (hoy - fechaVencimiento) - diasGracia de su condición.
+ *   Si el resultado es <= 0, todavía está dentro del período de gracia: no
+ *   se genera/actualiza mora para ese documento en esta pasada.
+ * - Monto de mora = saldo actual del documento * porcentajeMora / 100 (plano,
+ *   no prorrateado por día — igual de simple que el resto de porcentajes del
+ *   sistema, ej. condición de crédito o ajustes).
+ * - Si el documento ya tiene una mora ACTIVA, se actualiza in-place; si no,
+ *   se crea una nueva.
+ * - Una mora ACTIVA cuyo documento ya no tiene saldo pendiente se cierra
+ *   como PAGADA.
+ */
+export async function recalcularPendientes(): Promise<ResultadoRecalculoMora> {
+  const conn = await getConnection();
+  try {
+    const cerradasResult = await conn.execute(
+      `UPDATE CXC_MORA m
+          SET ESTADO = 'PAGADA'
+        WHERE UPPER(m.ESTADO) = 'ACTIVA'
+          AND EXISTS (
+            SELECT 1 FROM CXC_DOCUMENTOS d
+             WHERE d.ID_DOCUMENTO = m.ID_DOCUMENTO
+               AND d.SALDO <= 0.005
+          )`,
+    );
+
+    const candidatos = await conn.execute<{
+      ID_DOCUMENTO: number;
+      SALDO: number;
+      FECHA_VENCIMIENTO: Date;
+      DIAS_GRACIA: number;
+      PORCENTAJE_MORA: number;
+    }>(
+      `SELECT d.ID_DOCUMENTO, d.SALDO, d.FECHA_VENCIMIENTO, cc.DIAS_GRACIA, cc.PORCENTAJE_MORA
+         FROM CXC_DOCUMENTOS d
+         JOIN CXC_CONDICIONES_CREDITO cc ON cc.ID_CONDICION = d.ID_CONDICION_CREDITO
+        WHERE UPPER(cc.ESTADO) = 'A'
+          AND d.SALDO > 0.005
+          AND UPPER(d.ESTADO) NOT IN ('PAGADO', 'PAGADA', 'ANULADO', 'ANULADA')`,
+    );
+
+    const hoy = Date.now();
+    let activas = 0;
+
+    for (const row of candidatos.rows ?? []) {
+      const diasVencido = Math.floor((hoy - row.FECHA_VENCIMIENTO.getTime()) / 86_400_000);
+      const diasMora = diasVencido - Number(row.DIAS_GRACIA);
+      if (diasMora <= 0) continue; // todavía dentro del período de gracia
+
+      const saldo = roundMoney(Number(row.SALDO));
+      const montoMora = roundMoney((saldo * Number(row.PORCENTAJE_MORA)) / 100);
+
+      const existente = await conn.execute<{ ID_MORA: number }>(
+        `SELECT ID_MORA FROM CXC_MORA
+          WHERE ID_DOCUMENTO = :idDocumento AND UPPER(ESTADO) = 'ACTIVA'
+          FOR UPDATE`,
+        { idDocumento: row.ID_DOCUMENTO },
+      );
+      const moraExistente = existente.rows?.[0];
+
+      if (moraExistente) {
+        await conn.execute(
+          `UPDATE CXC_MORA
+              SET DIAS_MORA = :diasMora, SALDO_VENCIDO = :saldo,
+                  PORCENTAJE_MORA = :porcentaje, MONTO_MORA = :montoMora,
+                  FECHA_CALCULO = TRUNC(SYSDATE)
+            WHERE ID_MORA = :idMora`,
+          { diasMora, saldo, porcentaje: row.PORCENTAJE_MORA, montoMora, idMora: moraExistente.ID_MORA },
+        );
+      } else {
+        await conn.execute(
+          `INSERT INTO CXC_MORA
+             (ID_DOCUMENTO, DIAS_MORA, SALDO_VENCIDO, PORCENTAJE_MORA, MONTO_MORA, FECHA_CALCULO, ESTADO)
+           VALUES
+             (:idDocumento, :diasMora, :saldo, :porcentaje, :montoMora, TRUNC(SYSDATE), 'ACTIVA')`,
+          { idDocumento: row.ID_DOCUMENTO, diasMora, saldo, porcentaje: row.PORCENTAJE_MORA, montoMora },
+        );
+      }
+      activas += 1;
+    }
+
+    await conn.commit();
+    return { activas, cerradas: cerradasResult.rowsAffected ?? 0 };
   } catch (err) {
     await conn.rollback();
     throw err;

@@ -26,3 +26,7 @@ export async function update(req: Request, res: Response, next: NextFunction) {
 export async function remove(req: Request, res: Response, next: NextFunction) {
   try { await service.remove(Number(req.params.id)); res.status(204).send(); } catch (error) { next(error); }
 }
+
+export async function recalcular(_req: Request, res: Response, next: NextFunction) {
+  try { res.json(await service.recalcular()); } catch (error) { next(error); }
+}

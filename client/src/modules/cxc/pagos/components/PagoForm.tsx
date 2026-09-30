@@ -9,7 +9,6 @@ import {
   validateMoney,
   validateRequired,
   validateRequiredDate,
-  validateRequiredNumber,
   validateRequiredSelect,
   type ValidationErrors,
 } from '../../../../shared/validation';
@@ -38,6 +37,7 @@ export function PagoForm({
   const [clientes, setClientes] = useState<CatalogoOption[]>([]);
   const [formas, setFormas] = useState<FormaPagoOption[]>([]);
   const [monedas, setMonedas] = useState<CatalogoOption[]>([]);
+  const [bancos, setBancos] = useState<CatalogoOption[]>([]);
 
   const [idCliente, setIdCliente] = useState(pago?.idCliente?.toString() ?? '');
   const [idFormaPago, setIdFormaPago] = useState(pago?.idFormaPago?.toString() ?? '');
@@ -57,16 +57,19 @@ export function PagoForm({
       apiClient.get<CatalogoOption[]>('/cxc/catalogos/clientes'),
       apiClient.get<FormaPagoOption[]>('/cxc/catalogos/formas-pago'),
       apiClient.get<CatalogoOption[]>('/cxc/catalogos/monedas'),
+      apiClient.get<CatalogoOption[]>('/cxc/catalogos/bancos'),
     ])
-      .then(([clientesData, formasData, monedasData]) => {
+      .then(([clientesData, formasData, monedasData, bancosData]) => {
         setClientes(clientesData);
         setFormas(formasData);
         setMonedas(monedasData);
+        setBancos(bancosData);
       })
       .catch(() => {
         setClientes([]);
         setFormas([]);
         setMonedas([]);
+        setBancos([]);
       });
   }, []);
 
@@ -88,11 +91,6 @@ export function PagoForm({
     const monedaErr = validateRequiredSelect(idMoneda, 'una moneda');
     if (monedaErr) next.idMoneda = monedaErr;
 
-    if (idBanco) {
-      const bancoErr = validateRequiredNumber(idBanco, 'El ID del banco', { integer: true, positive: true });
-      if (bancoErr) next.idBanco = bancoErr;
-    }
-
     const fechaErr = validateRequiredDate(fechaPago, 'La fecha de pago', { notFuture: true, maxDate: todayIso() });
     if (fechaErr) next.fechaPago = fechaErr;
 
@@ -113,7 +111,7 @@ export function PagoForm({
     }
 
     return next;
-  }, [idCliente, idFormaPago, idMoneda, idBanco, fechaPago, monto, numeroReferencia, estado, formaSeleccionada, isLocked]);
+  }, [idCliente, idFormaPago, idMoneda, fechaPago, monto, numeroReferencia, estado, formaSeleccionada, isLocked]);
 
   const isFormValid = !hasErrors(validationErrors) && !isLocked;
   const errorFor = (field: string, touchedValue = '') =>
@@ -219,15 +217,14 @@ export function PagoForm({
           error={errorFor('idMoneda')}
           isReadOnly={isLocked}
         />
-        <TextInput
-          label="ID Banco"
-          type="number"
-          restriction="integer"
-          min={1}
+        <Select
+          label="Banco"
+          placeholder="Ninguno (opcional)"
           value={idBanco}
           onChange={(e: any) => setIdBanco(e.target.value)}
-          helperText="Temporalmente se captura ID hasta integrar el catálogo de Bancos."
-          error={errorFor('idBanco', idBanco)}
+          options={bancos.map((x) => ({ value: x.id, label: x.label }))}
+          helperText="Opcional. Solo aplica si el pago se recibió por transferencia/depósito bancario."
+          error={errorFor('idBanco')}
           isReadOnly={isLocked}
         />
       </div>

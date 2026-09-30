@@ -8,6 +8,7 @@ import {
 } from '@erp/contracts';
 import { BadRequestError, NotFoundError } from '../../../../shared/errors/AppError';
 import * as gestionCobroRepository from '../../repositories/cobranza/gestionCobro.repository';
+import * as promesaPagoRepository from '../../repositories/cobranza/promesaPago.repository';
 import * as catalogosRepository from '../../repositories/catalogos.repository';
 
 function assertId(id: number, label = 'ID') {
@@ -49,6 +50,31 @@ export async function createGestion(rawInput: unknown): Promise<GestionCobro> {
   }
   await assertRelaciones(input);
   const id = await gestionCobroRepository.create(input);
+
+  // Si la gestión registra un compromiso real (fecha + monto), se formaliza
+  // automáticamente como CXC_PROMESAS_PAGO ligada a esta gestión (ID_GESTION),
+  // en vez de dejar que el usuario tenga que capturar el mismo compromiso dos
+  // veces en dos pantallas distintas. Es un best-effort informativo (no
+  // comparte transacción con la gestión): si falla, la gestión ya quedó
+  // registrada de todas formas y no es una pérdida financiera.
+  if (input.fechaCompromiso && input.montoCompromiso) {
+    try {
+      await promesaPagoRepository.create({
+        idCliente: input.idCliente,
+        idDocumento: input.idDocumento ?? null,
+        idGestion: id,
+        fechaPromesa: businessTodayIso(),
+        fechaCompromiso: input.fechaCompromiso,
+        montoComprometido: input.montoCompromiso,
+        estado: 'PENDIENTE',
+        observaciones: `Generada automáticamente desde la gestión de cobro #${id}.`,
+      });
+    } catch {
+      // No bloquea la creación de la gestión; el usuario siempre puede
+      // registrar la promesa manualmente desde su propia pantalla.
+    }
+  }
+
   return getGestion(id);
 }
 

@@ -25,6 +25,14 @@ export async function monedas(_req: Request, res: Response, next: NextFunction) 
   }
 }
 
+export async function condicionesCredito(_req: Request, res: Response, next: NextFunction) {
+  try {
+    res.json(await catalogosRepository.listCondicionesCredito());
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function empleados(_req: Request, res: Response, next: NextFunction) {
   try {
     res.json(await catalogosRepository.listEmpleados());

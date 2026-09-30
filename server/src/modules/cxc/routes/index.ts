@@ -3,6 +3,8 @@ import organizacionRoutes from './organizacion';
 import cobranzaRoutes from './cobranza';
 import creditoRoutes from './credito';
 import catalogosRoutes from './catalogos.routes';
+import dashboardRoutes from './dashboard.routes';
+import reportesRoutes from './reportes.routes';
 import pagosRoutes from './pagos';
 import documentosRoutes from './documentos';
 
@@ -10,6 +12,12 @@ const router = Router();
 
 // Catálogos para los formularios
 router.use('/catalogos', catalogosRoutes);
+
+// Dashboard: agregaciones de solo lectura sobre todos los submódulos de CxC
+router.use('/', dashboardRoutes);
+
+// Reportes: antigüedad de saldos, estado de cuenta (solo lectura)
+router.use('/', reportesRoutes);
 
 // Cada área monta su propio sub-router aquí. Mantener el prefijo alineado
 // con el nombre del área para que las rutas queden legibles:

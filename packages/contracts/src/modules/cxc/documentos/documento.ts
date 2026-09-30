@@ -29,6 +29,9 @@ export const documentoSchema = z.object({
   idTipoDocumento: z.number().int(),
   nombreTipoDocumento: z.string().nullable().optional(),
   idMoneda: z.number().int(),
+  // Opcional: solo los documentos con condición asignada participan en el
+  // recálculo automático de mora (ver server mora.repository.ts).
+  idCondicionCredito: z.number().int().nullable(),
   estado: z.string(),
   condicion: z.enum(CONDICIONES_DOCUMENTO).optional(),
   serie: z.string().nullable(),
@@ -37,6 +40,10 @@ export const documentoSchema = z.object({
   fechaVencimiento: z.string(),
   total: z.number(),
   saldo: z.number(),
+  idEmpleadoAnulacion: z.number().int().nullable(),
+  nombreEmpleadoAnulacion: z.string().nullable().optional(),
+  fechaAnulacion: z.string().nullable(),
+  motivoAnulacion: z.string().nullable(),
 });
 
 export type Documento = z.infer<typeof documentoSchema>;
@@ -48,6 +55,7 @@ const documentoEditableBaseSchema = z.object({
   nitCliente: z.string().trim().max(20).nullable().optional(),
   idTipoDocumento: z.number().int().positive('Selecciona un tipo de documento'),
   idMoneda: z.number().int().positive('Selecciona una moneda'),
+  idCondicionCredito: z.number().int().positive().nullable().optional(),
   serie: optionalIdentifierSchema('La serie', 30),
   numeroDocumento: identifierSchema('El número de documento', 50),
   fechaDocumento: isoDateSchema('La fecha del documento'),
@@ -73,3 +81,10 @@ export type CreateDocumentoInput = z.infer<typeof createDocumentoSchema>;
  */
 export const updateDocumentoSchema = documentoEditableBaseSchema.partial();
 export type UpdateDocumentoInput = z.infer<typeof updateDocumentoSchema>;
+
+export const anularDocumentoSchema = z.object({
+  idEmpleadoAnulacion: z.number().int().positive('Selecciona el empleado que anula'),
+  motivoAnulacion: z.string().trim().min(10, 'Describe el motivo de la anulación (mínimo 10 caracteres)').max(250, 'El motivo no puede superar 250 caracteres'),
+  fechaAnulacion: isoDateSchema('La fecha de anulación').optional(),
+});
+export type AnularDocumentoInput = z.infer<typeof anularDocumentoSchema>;

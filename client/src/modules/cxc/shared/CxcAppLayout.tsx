@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ChevronDown,
   ChevronRight,
+  BarChart3,
   Coins,
   CreditCard,
   FileSpreadsheet,
@@ -42,6 +43,16 @@ type CxcMenuGroup = {
  */
 const CXC_GROUPS: CxcMenuGroup[] = [
   {
+    id: 'reportes',
+    label: 'Reportes',
+    icon: BarChart3,
+    matchPrefix: '/cxc/reportes',
+    items: [
+      { id: 'antiguedad-saldos', label: 'Antigüedad de Saldos', path: '/cxc/reportes/antiguedad-saldos' },
+      { id: 'estado-cuenta', label: 'Estado de Cuenta', path: '/cxc/reportes/estado-cuenta' },
+    ],
+  },
+  {
     id: 'documentos',
     label: 'Documentos',
     icon: FileSpreadsheet,
@@ -61,6 +72,7 @@ const CXC_GROUPS: CxcMenuGroup[] = [
       { id: 'pagos', label: 'Pagos', path: '/cxc/pagos/pagos' },
       { id: 'aplicaciones-pago', label: 'Aplicaciones de Pago', path: '/cxc/pagos/aplicaciones-pago' },
       { id: 'anticipos', label: 'Anticipos', path: '/cxc/pagos/anticipos' },
+      { id: 'aplicaciones-anticipo', label: 'Aplicaciones de Anticipo', path: '/cxc/pagos/aplicaciones-anticipo' },
       { id: 'recibos', label: 'Recibos', path: '/cxc/pagos/recibos' },
       { id: 'formas-pago', label: 'Formas de Pago', path: '/cxc/pagos/formas-pago' },
     ],
@@ -101,6 +113,8 @@ const CXC_GROUPS: CxcMenuGroup[] = [
   },
 ];
 
+const CXC_DASHBOARD_PATH = '/cxc/dashboard';
+
 const MAIN_MODULES = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'compras', label: 'Compras', icon: ShoppingCart },
@@ -118,18 +132,27 @@ export const CxcAppLayout = ({ children }: CxcAppLayoutProps) => {
   const location = useLocation();
   const navigate = useNavigate();
 
+  const isDashboardActive = location.pathname === CXC_DASHBOARD_PATH;
+
   const activeGroup = useMemo(
-    () => CXC_GROUPS.find((group) => location.pathname.startsWith(group.matchPrefix)) ?? CXC_GROUPS[0],
-    [location.pathname],
+    () =>
+      isDashboardActive
+        ? undefined
+        : CXC_GROUPS.find((group) => location.pathname.startsWith(group.matchPrefix)) ?? CXC_GROUPS[0],
+    [location.pathname, isDashboardActive],
   );
 
   const [cxcOpen, setCxcOpen] = useState(true);
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => ({ [activeGroup.id]: true }));
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() =>
+    activeGroup ? { [activeGroup.id]: true } : {},
+  );
 
   useEffect(() => {
     setCxcOpen(true);
-    setOpenGroups((current) => ({ ...current, [activeGroup.id]: true }));
-  }, [activeGroup.id]);
+    if (activeGroup) {
+      setOpenGroups((current) => ({ ...current, [activeGroup.id]: true }));
+    }
+  }, [activeGroup]);
 
   const toggleGroup = (groupId: string) => {
     setOpenGroups((current) => ({ ...current, [groupId]: !current[groupId] }));
@@ -197,9 +220,23 @@ export const CxcAppLayout = ({ children }: CxcAppLayoutProps) => {
 
                 {cxcOpen && (
                   <div id="cxc-navigation-groups" className="mt-1 ml-3 pl-3 border-l border-slate-700/70 space-y-1">
+                    <button
+                      type="button"
+                      onClick={() => navigate(CXC_DASHBOARD_PATH)}
+                      className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                        isDashboardActive
+                          ? 'text-blue-300 bg-slate-800/80'
+                          : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/50'
+                      }`}
+                      aria-current={isDashboardActive ? 'page' : undefined}
+                    >
+                      <LayoutDashboard size={15} aria-hidden="true" />
+                      <span className="flex-1 text-left">Dashboard</span>
+                    </button>
+
                     {CXC_GROUPS.map((group) => {
                       const GroupIcon = group.icon;
-                      const groupActive = activeGroup.id === group.id;
+                      const groupActive = activeGroup?.id === group.id;
                       const expanded = Boolean(openGroups[group.id]);
                       const regionId = `cxc-group-${group.id}`;
 
@@ -271,7 +308,9 @@ export const CxcAppLayout = ({ children }: CxcAppLayoutProps) => {
         <header className="h-16 shrink-0 bg-white border-b border-slate-200 px-6 flex items-center" aria-label="Contexto de navegación">
           <div className="min-w-0">
             <p className="text-[11px] uppercase tracking-wider font-semibold text-slate-400">Cuentas por Cobrar</p>
-            <h2 className="text-sm font-semibold text-slate-800 truncate">{activeGroup.label}</h2>
+            <h2 className="text-sm font-semibold text-slate-800 truncate">
+              {isDashboardActive ? 'Dashboard' : activeGroup?.label}
+            </h2>
           </div>
         </header>
         <main id="main-content" className="flex-1 overflow-y-auto p-6 bg-slate-50" tabIndex={-1}>

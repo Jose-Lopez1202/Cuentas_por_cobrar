@@ -45,3 +45,19 @@ export async function remove(req: Request, res: Response, next: NextFunction) {
     next(err);
   }
 }
+
+export async function aprobar(req: Request, res: Response, next: NextFunction) {
+  try {
+    res.json(await ajusteService.aprobarAjuste(Number(req.params.id), req.body));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function rechazar(req: Request, res: Response, next: NextFunction) {
+  try {
+    res.json(await ajusteService.rechazarAjuste(Number(req.params.id), req.body));
+  } catch (err) {
+    next(err);
+  }
+}

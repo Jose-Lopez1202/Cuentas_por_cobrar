@@ -2,13 +2,16 @@ import { businessTodayIso } from '../../../../shared/date';
 import {
   createAnticipoSchema,
   updateAnticipoSchema,
+  anularAnticipoSchema,
   buildPaginationMeta,
   type PaginatedResponse,
   type Anticipo,
 } from '@erp/contracts';
 import * as repository from '../../repositories/pagos/anticipo.repository';
 import * as pagoRepository from '../../repositories/pagos/pago.repository';
-import { BadRequestError, NotFoundError } from '../../../../shared/errors/AppError';
+import * as aplicacionRepository from '../../repositories/pagos/aplicacionAnticipo.repository';
+import * as catalogosRepository from '../../repositories/catalogos.repository';
+import { BadRequestError, ConflictError, NotFoundError } from '../../../../shared/errors/AppError';
 
 
 export async function listAnticipos(q: {
@@ -47,6 +50,13 @@ export async function createAnticipo(raw: unknown): Promise<Anticipo> {
 
 export async function updateAnticipo(id: number, raw: unknown): Promise<Anticipo> {
   const current = await getAnticipo(id);
+  const aplicado = await aplicacionRepository.sumAplicadoPorAnticipo(id);
+  if (aplicado > 0.005) {
+    throw new ConflictError(
+      'El anticipo ya tiene aplicaciones y no puede editarse directamente. Primero debe reversarse la aplicación.',
+    );
+  }
+
   const input = updateAnticipoSchema.parse(raw);
   const finalFecha = input.fecha ?? current.fecha.slice(0, 10);
   if (finalFecha > businessTodayIso()) throw new BadRequestError('La fecha del anticipo no puede ser futura');
@@ -63,6 +73,28 @@ export async function updateAnticipo(id: number, raw: unknown): Promise<Anticipo
 }
 
 export async function deleteAnticipo(id: number): Promise<void> {
-  await getAnticipo(id);
+  const current = await getAnticipo(id);
+  const aplicado = await aplicacionRepository.sumAplicadoPorAnticipo(id);
+  if (aplicado > 0.005) {
+    throw new ConflictError('Un anticipo aplicado no se elimina. Debe reversarse/anularse para conservar trazabilidad.');
+  }
+  if (!['DISPONIBLE'].includes(String(current.estado).toUpperCase())) {
+    throw new ConflictError('Solo un anticipo disponible y sin aplicaciones puede eliminarse físicamente.');
+  }
   await repository.remove(id);
+}
+
+export async function anularAnticipo(id: number, rawInput: unknown): Promise<Anticipo> {
+  if (!Number.isInteger(id) || id <= 0) throw new BadRequestError('ID de anticipo inválido');
+  const input = anularAnticipoSchema.parse(rawInput);
+  if (input.fechaAnulacion && input.fechaAnulacion > businessTodayIso()) {
+    throw new BadRequestError('La fecha de anulación no puede ser futura');
+  }
+  if (!(await catalogosRepository.empleadoExiste(input.idEmpleadoAnulacion))) {
+    throw new BadRequestError('El empleado seleccionado no existe');
+  }
+
+  await getAnticipo(id);
+  await repository.anular(id, input);
+  return getAnticipo(id);
 }

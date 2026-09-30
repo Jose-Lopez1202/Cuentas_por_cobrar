@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Ban } from 'lucide-react';
 import { DataTable, StatusBadge, Button, TextInput } from '../../../shared/ui-kit';
-import { Modal } from '../../../shared/components';
+import { Modal, TrazabilidadActionModal } from '../../../shared/components';
 import { ConfirmDialog } from '../../../shared/components/ConfirmDialog';
 import { usePaginatedList } from '../../../shared/hooks';
 import { apiClient, ApiError } from '../../../shared/api';
@@ -19,6 +19,7 @@ export const NotasCreditoPage = () => {
   const [notaAEliminar, setNotaAEliminar] = useState<NotaCredito | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [aAnular, setAAnular] = useState<NotaCredito | null>(null);
 
   const { data, meta, isLoading, error, refetch } = usePaginatedList<NotaCredito>(
     '/cxc/notas-credito',
@@ -89,6 +90,7 @@ export const NotasCreditoPage = () => {
             align: 'right',
             cell: ({ row }: any) => {
               const locked = Number(row.montoAplicado ?? 0) > 0.005 || ['APLICADA', 'ANULADA'].includes(String(row.estado).toUpperCase());
+              const anulable = Number(row.montoAplicado ?? 0) <= 0.005 && String(row.estado).toUpperCase() !== 'ANULADA';
               return (
                 <div className="flex justify-end gap-1">
                   <button
@@ -97,6 +99,14 @@ export const NotasCreditoPage = () => {
                     title={locked ? 'Ver nota bloqueada por aplicaciones' : 'Editar nota'}
                   >
                     <Pencil size={15} />
+                  </button>
+                  <button
+                    onClick={() => anulable && setAAnular(row)}
+                    disabled={!anulable}
+                    className={`p-1.5 rounded-md transition-colors ${anulable ? 'text-slate-400 hover:text-amber-700 hover:bg-amber-50' : 'text-slate-300 cursor-not-allowed'}`}
+                    title={anulable ? 'Anular nota' : 'Una nota con aplicaciones o ya anulada no se puede anular de nuevo'}
+                  >
+                    <Ban size={15} />
                   </button>
                   <button
                     onClick={() => !locked && setNotaAEliminar(row)}
@@ -140,6 +150,21 @@ export const NotasCreditoPage = () => {
         confirmLabel="Eliminar"
         isLoading={isDeleting}
       />
+
+      {aAnular && (
+        <TrazabilidadActionModal
+          title={`Anular nota de crédito #${aAnular.idNotaCredito}`}
+          description="La nota quedará marcada como anulada de forma permanente. Solo se puede anular una nota sin aplicaciones vigentes."
+          endpoint={`/cxc/notas-credito/${aAnular.idNotaCredito}/anular`}
+          actionLabel="Anular"
+          empleadoLabel="Empleado que anula"
+          empleadoFieldName="idEmpleadoAnulacion"
+          motivoLabel="Motivo de la anulación"
+          motivoFieldName="motivoAnulacion"
+          onClose={() => setAAnular(null)}
+          onSuccess={() => { setAAnular(null); refetch(); }}
+        />
+      )}
     </div>
   );
 };

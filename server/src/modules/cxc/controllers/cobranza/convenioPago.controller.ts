@@ -67,3 +67,21 @@ export async function pagarCuota(req: Request, res: Response, next: NextFunction
     next(err);
   }
 }
+
+export async function listDocumentos(req: Request, res: Response, next: NextFunction) {
+  try {
+    const documentos = await convenioPagoService.getDocumentosDeConvenio(Number(req.params.id));
+    res.json(documentos);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function recalcular(_req: Request, res: Response, next: NextFunction) {
+  try {
+    const resultado = await convenioPagoService.recalcularConvenios();
+    res.json(resultado);
+  } catch (err) {
+    next(err);
+  }
+}

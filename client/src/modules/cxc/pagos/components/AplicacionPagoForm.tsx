@@ -87,6 +87,9 @@ export function AplicacionPagoForm({
     const documentoErr = validateRequiredSelect(idDocumento, 'un documento pendiente del cliente');
     if (documentoErr) next.idDocumento = documentoErr;
 
+    const empleadoErr = validateRequiredSelect(idEmpleado, 'el empleado que aplica el pago');
+    if (empleadoErr) next.idEmpleado = empleadoErr;
+
     const fechaErr = validateRequiredDate(fechaAplicacion, 'La fecha de aplicación', {
       notFuture: true,
       maxDate: todayIso(),
@@ -103,7 +106,7 @@ export function AplicacionPagoForm({
     }
 
     return next;
-  }, [idPago, idDocumento, fechaAplicacion, montoAplicado, maxAplicable]);
+  }, [idPago, idDocumento, idEmpleado, fechaAplicacion, montoAplicado, maxAplicable]);
 
   const isFormValid = !hasErrors(validationErrors);
   const errorFor = (field: string, value = '') =>
@@ -130,7 +133,7 @@ export function AplicacionPagoForm({
       idDocumento: Number(idDocumento),
       fechaAplicacion,
       montoAplicado: Number(montoAplicado),
-      idEmpleado: idEmpleado ? Number(idEmpleado) : undefined,
+      idEmpleado: Number(idEmpleado),
     };
 
     try {
@@ -205,10 +208,12 @@ export function AplicacionPagoForm({
 
       <Select
         label="Empleado"
+        required
         value={idEmpleado}
         onChange={(e: any) => setEmp(e.target.value)}
         options={empleados.map((x) => ({ value: x.id, label: x.label }))}
-        helperText="Opcional: empleado responsable de registrar la aplicación."
+        helperText="Empleado responsable de registrar la aplicación."
+        error={errorFor('idEmpleado')}
       />
 
       {formError && (

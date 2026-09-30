@@ -1,6 +1,7 @@
 import oracledb from 'oracledb';
 import { getConnection } from '../../../../config/database';
 import type { RutaDetalle, CreateRutaDetalleInput, UpdateRutaDetalleInput } from '@erp/contracts';
+import { NotFoundError } from '../../../../shared/errors/AppError';
 
 interface RutaDetalleRow {
   ID_RUTA_DETALLE: number;
@@ -31,12 +32,14 @@ function mapRow(row: RutaDetalleRow): RutaDetalle {
 }
 
 // OJO: la tabla de clientes en la base se llama CLIENTE (no CXC_CLIENTES).
+// LEFT JOIN (no JOIN normal): un ID_CLIENTE huérfano no debe borrar la parada
+// de la ruta del listado del cobrador ni causar un falso 404 en findById.
 const SELECT_BASE = `
   SELECT d.ID_RUTA_DETALLE, d.ID_RUTA, d.ID_CLIENTE, c.NOMBRE AS NOMBRE_CLIENTE,
          d.ORDEN_VISITA, d.DIRECCION, d.MONTO_PENDIENTE,
          d.ESTADO_VISITA, d.HORA_VISITA, d.OBSERVACIONES
   FROM CXC_RUTA_DETALLE d
-  JOIN CLIENTE c ON c.ID_CLIENTE = d.ID_CLIENTE
+  LEFT JOIN CLIENTE c ON c.ID_CLIENTE = d.ID_CLIENTE
 `;
 
 /** Lista las paradas de UNA ruta específica, ordenadas por orden de visita. */
@@ -107,11 +110,15 @@ export async function update(id: number, input: UpdateRutaDetalleInput): Promise
   if (input.horaVisita !== undefined) { fields.push('HORA_VISITA = :horaVisita'); binds.horaVisita = input.horaVisita; }
   if (input.observaciones !== undefined) { fields.push('OBSERVACIONES = :observaciones'); binds.observaciones = input.observaciones; }
 
-  if (fields.length === 0) return;
+  if (fields.length === 0) {
+    if (!(await findById(id))) throw new NotFoundError(`Parada de ruta ${id} no encontrada`);
+    return;
+  }
 
   const conn = await getConnection();
   try {
-    await conn.execute(`UPDATE CXC_RUTA_DETALLE SET ${fields.join(', ')} WHERE ID_RUTA_DETALLE = :id`, binds);
+    const result = await conn.execute(`UPDATE CXC_RUTA_DETALLE SET ${fields.join(', ')} WHERE ID_RUTA_DETALLE = :id`, binds);
+    if (!result.rowsAffected) throw new NotFoundError(`Parada de ruta ${id} no encontrada`);
     await conn.commit();
   } catch (err) {
     await conn.rollback();
@@ -124,7 +131,8 @@ export async function update(id: number, input: UpdateRutaDetalleInput): Promise
 export async function remove(id: number): Promise<void> {
   const conn = await getConnection();
   try {
-    await conn.execute(`DELETE FROM CXC_RUTA_DETALLE WHERE ID_RUTA_DETALLE = :id`, { id });
+    const result = await conn.execute(`DELETE FROM CXC_RUTA_DETALLE WHERE ID_RUTA_DETALLE = :id`, { id });
+    if (!result.rowsAffected) throw new NotFoundError(`Parada de ruta ${id} no encontrada`);
     await conn.commit();
   } catch (err) {
     await conn.rollback();

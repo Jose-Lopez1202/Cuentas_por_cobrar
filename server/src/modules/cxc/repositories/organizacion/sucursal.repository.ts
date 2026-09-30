@@ -1,6 +1,7 @@
 import oracledb from 'oracledb';
 import { getConnection } from '../../../../config/database';
 import type { Sucursal, CreateSucursalInput, UpdateSucursalInput } from '@erp/contracts';
+import { NotFoundError } from '../../../../shared/errors/AppError';
 
 interface SucursalRow {
   ID_SUCURSAL: number;
@@ -22,11 +23,14 @@ function mapRow(row: SucursalRow): Sucursal {
   };
 }
 
+// LEFT JOIN (no JOIN normal): consistente con el resto de repositorios de
+// organización; una empresa referenciada que no resuelva no debe ocultar la
+// sucursal del listado ni causar un falso 404 en findById.
 const SELECT_BASE = `
   SELECT s.ID_SUCURSAL, s.ID_EMPRESA, e.NOMBRE AS NOMBRE_EMPRESA,
          s.NOMBRE, s.DIRECCION, s.ESTADO
   FROM CXC_SUCURSALES s
-  JOIN CXC_EMPRESAS e ON e.ID_EMPRESA = s.ID_EMPRESA
+  LEFT JOIN CXC_EMPRESAS e ON e.ID_EMPRESA = s.ID_EMPRESA
 `;
 
 export async function findAll(params: {
@@ -50,7 +54,7 @@ export async function findAll(params: {
     );
 
     const countResult = await conn.execute<{ TOTAL: number }>(
-      `SELECT COUNT(*) AS TOTAL FROM CXC_SUCURSALES s JOIN CXC_EMPRESAS e ON e.ID_EMPRESA = s.ID_EMPRESA ${whereClause}`,
+      `SELECT COUNT(*) AS TOTAL FROM CXC_SUCURSALES s LEFT JOIN CXC_EMPRESAS e ON e.ID_EMPRESA = s.ID_EMPRESA ${whereClause}`,
       searchBind,
     );
 
@@ -106,11 +110,15 @@ export async function update(id: number, input: UpdateSucursalInput): Promise<vo
   if (input.direccion !== undefined) { fields.push('DIRECCION = :direccion'); binds.direccion = input.direccion; }
   if (input.estado !== undefined) { fields.push('ESTADO = :estado'); binds.estado = input.estado; }
 
-  if (fields.length === 0) return;
+  if (fields.length === 0) {
+    if (!(await findById(id))) throw new NotFoundError(`Sucursal ${id} no encontrada`);
+    return;
+  }
 
   const conn = await getConnection();
   try {
-    await conn.execute(`UPDATE CXC_SUCURSALES SET ${fields.join(', ')} WHERE ID_SUCURSAL = :id`, binds);
+    const result = await conn.execute(`UPDATE CXC_SUCURSALES SET ${fields.join(', ')} WHERE ID_SUCURSAL = :id`, binds);
+    if (!result.rowsAffected) throw new NotFoundError(`Sucursal ${id} no encontrada`);
     await conn.commit();
   } catch (err) {
     await conn.rollback();
@@ -123,7 +131,8 @@ export async function update(id: number, input: UpdateSucursalInput): Promise<vo
 export async function remove(id: number): Promise<void> {
   const conn = await getConnection();
   try {
-    await conn.execute(`DELETE FROM CXC_SUCURSALES WHERE ID_SUCURSAL = :id`, { id });
+    const result = await conn.execute(`DELETE FROM CXC_SUCURSALES WHERE ID_SUCURSAL = :id`, { id });
+    if (!result.rowsAffected) throw new NotFoundError(`Sucursal ${id} no encontrada`);
     await conn.commit();
   } catch (err) {
     await conn.rollback();

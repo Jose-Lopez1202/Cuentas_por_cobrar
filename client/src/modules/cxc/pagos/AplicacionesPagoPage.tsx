@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Plus, Search } from 'lucide-react';
-import { DataTable, Button, TextInput } from '../../../shared/ui-kit';
-import { Modal } from '../../../shared/components';
+import { Plus, Search, Undo2 } from 'lucide-react';
+import { DataTable, Button, TextInput, StatusBadge } from '../../../shared/ui-kit';
+import { Modal, TrazabilidadActionModal } from '../../../shared/components';
 import { usePaginatedList } from '../../../shared/hooks';
 import { formatDateGT } from '../../../shared/date';
 import type { AplicacionPago } from '@erp/contracts';
@@ -17,6 +17,7 @@ export const AplicacionesPagoPage = () => {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState(false);
+  const [aReversar, setAReversar] = useState<AplicacionPago | null>(null);
 
   const { data, meta, isLoading, error, refetch } =
     usePaginatedList<AplicacionPago>('/cxc/aplicaciones-pago', {
@@ -40,7 +41,7 @@ export const AplicacionesPagoPage = () => {
       </div>
 
       <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-        Una aplicación confirmada es inmutable. Para corregirla debe utilizarse una reversión; no se edita ni se elimina físicamente.
+        Una aplicación confirmada es inmutable. Para corregirla, reversa la aplicación con motivo y trazabilidad.
       </div>
 
       <div className="bg-white p-4 rounded-lg border border-slate-200">
@@ -90,6 +91,30 @@ export const AplicacionesPagoPage = () => {
             header: 'Empleado',
             cell: ({ row }: any) => row.nombreEmpleado || (row.idEmpleado ? `#${row.idEmpleado}` : '—'),
           },
+          {
+            header: 'Estado',
+            cell: ({ row }: any) => (
+              <div className="flex flex-col gap-0.5">
+                <StatusBadge status={row.estado} />
+                {row.estado === 'REVERSADA' && row.nombreEmpleadoReversa && (
+                  <span className="text-[11px] text-slate-400">por {row.nombreEmpleadoReversa}</span>
+                )}
+              </div>
+            ),
+          },
+          {
+            header: '',
+            align: 'right',
+            cell: ({ row }: any) =>
+              row.estado === 'CONFIRMADA' ? (
+                <button
+                  onClick={() => setAReversar(row)}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-md transition-colors"
+                >
+                  <Undo2 size={13} /> Reversar
+                </button>
+              ) : null,
+          },
         ]}
         paginationProps={{
           currentPage: meta.page,
@@ -113,6 +138,21 @@ export const AplicacionesPagoPage = () => {
           }}
         />
       </Modal>
+
+      {aReversar && (
+        <TrazabilidadActionModal
+          title={`Reversar aplicación #${aReversar.idAplicacion}`}
+          description={`Se le devolverá ${money(aReversar.montoAplicado)} al saldo del documento y al disponible del pago.`}
+          endpoint={`/cxc/aplicaciones-pago/${aReversar.idAplicacion}/reversar`}
+          actionLabel="Reversar"
+          empleadoLabel="Empleado que reversa"
+          empleadoFieldName="idEmpleadoReversa"
+          motivoLabel="Motivo de la reversa"
+          motivoFieldName="motivoReversa"
+          onClose={() => setAReversar(null)}
+          onSuccess={() => { setAReversar(null); refetch(); }}
+        />
+      )}
     </div>
   );
 };

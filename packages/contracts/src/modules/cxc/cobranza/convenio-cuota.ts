@@ -14,6 +14,10 @@ export const convenioCuotaSchema = z.object({
   idFormaPago: z.number().int().nullable(),
   nombreFormaPago: z.string().nullable().optional(),
   referenciaPago: z.string().nullable(),
+  // Calculado al leer, nunca persistido: PENDIENTE con fechaVencimiento ya
+  // pasada. No sobreescribe `estado` (que sigue siendo autoridad del CRUD),
+  // es una señal visual adicional. Mismo patrón que Documento.condicion.
+  estaVencida: z.boolean(),
 });
 export type ConvenioCuota = z.infer<typeof convenioCuotaSchema>;
 
@@ -33,5 +37,6 @@ export const registrarPagoCuotaSchema = z.object({
   montoPagado: moneySchema('El monto pagado', true),
   idFormaPago: z.number().int().positive('Selecciona una forma de pago'),
   referenciaPago: optionalIdentifierSchema('La referencia de pago', 50),
+  idEmpleado: z.number().int().positive('Selecciona el empleado que registra el pago'),
 });
 export type RegistrarPagoCuotaInput = z.infer<typeof registrarPagoCuotaSchema>;

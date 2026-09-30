@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
 import { AppError } from '../shared/errors/AppError';
+import { logger } from '../shared/logger';
 
 /**
  * Punto único para transformar errores de dominio/validación en HTTP.
@@ -9,7 +10,7 @@ import { AppError } from '../shared/errors/AppError';
  */
 export function errorHandler(
   err: unknown,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction,
 ) {
@@ -38,7 +39,12 @@ export function errorHandler(
     return;
   }
 
-  console.error('[ERP Server] Error no controlado:', err);
+  logger.error('unhandled_error', {
+    method: req.method,
+    path: req.originalUrl,
+    error: err instanceof Error ? err.message : String(err),
+    stack: err instanceof Error ? err.stack : undefined,
+  });
   res.status(500).json({
     error: 'Error interno del servidor',
     code: 'INTERNAL_ERROR',

@@ -2,15 +2,17 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import cxcRoutes from './modules/cxc/routes';
-import { errorHandler, noStore, securityHeaders } from './middlewares';
+import { errorHandler, noStore, requestLogger, securityHeaders } from './middlewares';
 import { initOraclePool, closeOraclePool } from './config/database';
 import { config } from './config';
+import { logger } from './shared/logger';
 
 const app = express();
 const PORT = config.port;
 
 app.disable('x-powered-by');
 app.use(securityHeaders);
+app.use(requestLogger);
 app.use(cors({
   origin(origin, callback) {
     // Herramientas locales/server-to-server pueden no enviar Origin.
@@ -40,14 +42,14 @@ async function bootstrap() {
     await initOraclePool();
 
     const server = app.listen(PORT, () => {
-      console.log(`[ERP Server]: API base corriendo en http://localhost:${PORT}`);
+      logger.info('server_started', { port: PORT });
     });
 
     let shuttingDown = false;
     const shutdown = async () => {
       if (shuttingDown) return;
       shuttingDown = true;
-      console.log('\n[ERP Server]: Cerrando servidor...');
+      logger.info('server_shutdown_initiated');
 
       server.close(async () => {
         try {
@@ -61,7 +63,7 @@ async function bootstrap() {
     process.once('SIGINT', shutdown);
     process.once('SIGTERM', shutdown);
   } catch (error) {
-    console.error('[ERP Server]: Error fatal al iniciar', error);
+    logger.error('server_startup_failed', { error: error instanceof Error ? error.message : String(error) });
     process.exit(1);
   }
 }

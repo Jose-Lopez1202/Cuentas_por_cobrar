@@ -83,6 +83,30 @@ export async function listMonedas(): Promise<DocumentoCatalogoOption[]> {
   }
 }
 
+export async function listCondicionesCredito(): Promise<DocumentoCatalogoOption[]> {
+  const conn = await getConnection();
+  try {
+    const result = await conn.execute<{
+      ID_CONDICION: number;
+      DIAS_CREDITO: number;
+      PORCENTAJE_MORA: number;
+      DIAS_GRACIA: number;
+    }>(
+      `SELECT ID_CONDICION, DIAS_CREDITO, PORCENTAJE_MORA, DIAS_GRACIA
+         FROM CXC_CONDICIONES_CREDITO
+        WHERE TRIM(ESTADO) = 'A'
+        ORDER BY DIAS_CREDITO ASC`,
+    );
+
+    return (result.rows ?? []).map((r) => ({
+      id: r.ID_CONDICION,
+      label: `${r.DIAS_CREDITO} días crédito · ${Number(r.PORCENTAJE_MORA)}% mora tras ${r.DIAS_GRACIA}d de gracia`,
+    }));
+  } finally {
+    await conn.close();
+  }
+}
+
 export async function listEmpleados(): Promise<DocumentoCatalogoOption[]> {
   const conn = await getConnection();
   try {

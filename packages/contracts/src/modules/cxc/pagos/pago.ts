@@ -23,12 +23,17 @@ export const pagoSchema = z.object({
   idFormaPago: z.number().int(),
   idMoneda: z.number().int(),
   idBanco: z.number().int().nullable(),
+  nombreBanco: z.string().nullable().optional(),
   fechaPago: z.string(),
   monto: z.number(),
   montoAplicado: z.number().optional(),
   montoDisponible: z.number().optional(),
   numeroReferencia: z.string().nullable(),
   estado: z.string(),
+  idEmpleadoAnulacion: z.number().int().nullable(),
+  nombreEmpleadoAnulacion: z.string().nullable().optional(),
+  fechaAnulacion: z.string().nullable(),
+  motivoAnulacion: z.string().nullable(),
 });
 export type Pago = z.infer<typeof pagoSchema>;
 
@@ -51,3 +56,10 @@ export const updatePagoSchema = pagoBaseSchema.partial().extend({
   estado: z.enum(ESTADOS_PAGO_REGISTRO).optional(),
 });
 export type UpdatePagoInput = z.infer<typeof updatePagoSchema>;
+
+export const anularPagoSchema = z.object({
+  idEmpleadoAnulacion: z.number().int().positive('Selecciona el empleado que anula'),
+  motivoAnulacion: z.string().trim().min(10, 'Describe el motivo de la anulación (mínimo 10 caracteres)').max(250, 'El motivo no puede superar 250 caracteres'),
+  fechaAnulacion: isoDateSchema('La fecha de anulación').optional(),
+});
+export type AnularPagoInput = z.infer<typeof anularPagoSchema>;

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Trash2, Search, Eye } from 'lucide-react';
+import { Plus, Trash2, Search, Eye, RefreshCw } from 'lucide-react';
 import { DataTable, StatusBadge, Button, TextInput } from '../../../shared/ui-kit';
 import { Modal } from '../../../shared/components';
 import { ConfirmDialog } from '../../../shared/components/ConfirmDialog';
@@ -19,6 +19,9 @@ export const ConveniosPagoPage = () => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [convenioAEliminar, setConvenioAEliminar] = useState<ConvenioPago | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isRecalculando, setIsRecalculando] = useState(false);
+  const [recalculoMensaje, setRecalculoMensaje] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const { data, meta, isLoading, error, refetch } = usePaginatedList<ConvenioPago>(
     '/cxc/convenios-pago',
@@ -28,14 +31,29 @@ export const ConveniosPagoPage = () => {
   const handleDelete = async () => {
     if (!convenioAEliminar) return;
     setIsDeleting(true);
+    setDeleteError(null);
     try {
       await apiClient.delete(`/cxc/convenios-pago/${convenioAEliminar.idConvenio}`);
       setConvenioAEliminar(null);
       refetch();
     } catch (err) {
-      console.error(err instanceof ApiError ? err.message : err);
+      setDeleteError(err instanceof ApiError ? err.message : 'No se pudo eliminar el convenio');
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleRecalcular = async () => {
+    setIsRecalculando(true);
+    setRecalculoMensaje(null);
+    try {
+      const resultado = await apiClient.post<{ actualizados: number }>('/cxc/convenios-pago/recalcular', {});
+      setRecalculoMensaje(`${resultado.actualizados} convenio(s) marcado(s) como INCUMPLIDO por cuotas vencidas sin pagar.`);
+      refetch();
+    } catch (err) {
+      setRecalculoMensaje(err instanceof ApiError ? err.message : 'No se pudo recalcular');
+    } finally {
+      setIsRecalculando(false);
     }
   };
 
@@ -44,12 +62,21 @@ export const ConveniosPagoPage = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Convenios de Pago</h1>
-          <p className="text-sm text-slate-500">Planes de pago a cuotas acordados con clientes en mora.</p>
+          <p className="text-sm text-slate-500">Planes de pago a cuotas acordados con clientes en mora. Pagar una cuota reduce el saldo real de los documentos que cubre el convenio.</p>
         </div>
-        <Button icon={Plus} onClick={() => setIsCreateOpen(true)}>
-          Nuevo Convenio
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" icon={RefreshCw} onClick={handleRecalcular} disabled={isRecalculando}>
+            {isRecalculando ? 'Recalculando...' : 'Recalcular incumplimiento'}
+          </Button>
+          <Button icon={Plus} onClick={() => setIsCreateOpen(true)}>
+            Nuevo Convenio
+          </Button>
+        </div>
       </div>
+
+      {recalculoMensaje && (
+        <p className="text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">{recalculoMensaje}</p>
+      )}
 
       <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
         <TextInput
@@ -119,10 +146,13 @@ export const ConveniosPagoPage = () => {
 
       <ConfirmDialog
         isOpen={!!convenioAEliminar}
-        onClose={() => setConvenioAEliminar(null)}
+        onClose={() => { setConvenioAEliminar(null); setDeleteError(null); }}
         onConfirm={handleDelete}
         title="Eliminar convenio de pago"
-        description={`¿Eliminar el convenio de ${convenioAEliminar?.nombreCliente}? Esto también elimina todas sus cuotas. Esta acción no se puede deshacer.`}
+        description={
+          deleteError ??
+          `¿Eliminar el convenio de ${convenioAEliminar?.nombreCliente}? Solo se permite si ninguna cuota tiene pagos registrados; si ya tiene pagos, cámbialo a CANCELADO en su lugar.`
+        }
         confirmLabel="Eliminar"
         isLoading={isDeleting}
       />
