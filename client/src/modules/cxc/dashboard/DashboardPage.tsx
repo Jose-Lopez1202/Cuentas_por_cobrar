@@ -11,7 +11,17 @@ import {
 } from 'lucide-react';
 import type { DashboardResumen } from '@erp/contracts';
 import { apiClient, ApiError } from '../../../shared/api';
-import { HorizontalBarList, TrendLineChart, KpiTile, tint, type HorizontalBarItem } from '../../../shared/charts';
+import {
+  DonutChart,
+  HorizontalBarList,
+  KpiTile,
+  StackedBar,
+  TrendLineChart,
+  VerticalBarChart,
+  tint,
+  type ChartDatum,
+  type HorizontalBarItem,
+} from '../../../shared/charts';
 import { getStatusLabel, getStatusTone, TONE_HEX } from '../../../shared/components/UnifiedStatusBadge';
 
 const formatMoney = (value: number) =>
@@ -76,6 +86,21 @@ function toRutaEstadoBars(items: Array<{ tipo: string; cantidad: number }>): Hor
   }));
 }
 
+/** Misma paleta de estado que las barras, para circulares y columnas. */
+function toStatusDatums(
+  items: Array<{ estado: string; cantidad: number; monto: number }>,
+  field: 'cantidad' | 'monto' = 'cantidad',
+): ChartDatum[] {
+  return items.map((item) => ({
+    key: item.estado,
+    label: getStatusLabel(item.estado),
+    value: item[field],
+    color: TONE_HEX[getStatusTone(item.estado)],
+  }));
+}
+
+const CARTERA_COLORS = { vigente: '#2a78d6', vencida: '#d03b3b' } as const;
+
 interface ModuleSectionProps {
   module: keyof typeof MODULES;
   description?: string;
@@ -127,14 +152,20 @@ export const DashboardPage = () => {
 
     apiClient
       .get<DashboardResumen>('/cxc/dashboard/resumen', { signal: controller.signal })
-      .then(setResumen)
-      .catch((err) => {
-        if (err instanceof ApiError) setError(err.message);
-        else if (!(err instanceof DOMException && err.name === 'AbortError')) {
-          setError('No se pudo cargar el dashboard.');
-        }
+      .then((data) => {
+        if (controller.signal.aborted) return;
+        setResumen(data);
+        setError(null);
       })
-      .finally(() => setIsLoading(false));
+      .catch((err) => {
+        // Una petición cancelada (cleanup de React StrictMode o cambio de
+        // pantalla) ya no es la vigente: su fallo no debe mostrarse.
+        if (controller.signal.aborted) return;
+        setError(err instanceof ApiError ? err.message : 'No se pudo cargar el dashboard.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoading(false);
+      });
 
     return () => controller.abort();
   }, []);
@@ -196,29 +227,57 @@ export const DashboardPage = () => {
             />
           </div>
 
-          {/* Documentos */}
-          <ModuleSection module="documentos">
-            <ChartCard title="Documentos por estado — cantidad y saldo asociado">
-              <HorizontalBarList
-                items={toStatusBars(resumen.documentos.porEstado)}
-                valueFormatter={formatCount}
-                secondaryFormatter={(v) => `Saldo: ${formatMoney(v)}`}
+          {/* Salud de la cartera */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <ChartCard title="Cartera: vigente vs. vencida">
+              <DonutChart
+                items={[
+                  {
+                    key: 'vigente',
+                    label: 'Vigente',
+                    value: Math.max(resumen.kpis.carteraTotal - resumen.kpis.carteraVencida, 0),
+                    color: CARTERA_COLORS.vigente,
+                  },
+                  { key: 'vencida', label: 'Vencida', value: resumen.kpis.carteraVencida, color: CARTERA_COLORS.vencida },
+                ]}
+                valueFormatter={formatMoney}
+                centerCaption="Cartera total"
               />
             </ChartCard>
+            <ChartCard title="Saldo de documentos por estado">
+              <VerticalBarChart items={toStatusDatums(resumen.documentos.porEstado, 'monto')} valueFormatter={formatMoney} />
+            </ChartCard>
+          </div>
+
+          {/* Documentos */}
+          <ModuleSection module="documentos">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <ChartCard title="Documentos por estado — cantidad y saldo asociado">
+                <HorizontalBarList
+                  items={toStatusBars(resumen.documentos.porEstado)}
+                  valueFormatter={formatCount}
+                  secondaryFormatter={(v) => `Saldo: ${formatMoney(v)}`}
+                />
+              </ChartCard>
+              <ChartCard title="Distribución de documentos">
+                <DonutChart items={toStatusDatums(resumen.documentos.porEstado)} valueFormatter={formatCount} centerCaption="Documentos" />
+              </ChartCard>
+            </div>
           </ModuleSection>
 
           {/* Cobranza */}
           <ModuleSection module="cobranza">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <ChartCard title="Gestiones de cobro por tipo">
-                <HorizontalBarList items={toTipoBars(resumen.cobranza.gestionesPorTipo)} valueFormatter={formatCount} />
+                <DonutChart
+                  variant="pie"
+                  size={150}
+                  items={toTipoBars(resumen.cobranza.gestionesPorTipo)}
+                  valueFormatter={formatCount}
+                />
               </ChartCard>
               <ChartCard title="Promesas de pago por estado">
-                <HorizontalBarList
-                  items={toStatusBars(resumen.cobranza.promesasPorEstado)}
-                  valueFormatter={formatCount}
-                  secondaryFormatter={(v) => `Comprometido: ${formatMoney(v)}`}
-                />
+                <VerticalBarChart items={toStatusDatums(resumen.cobranza.promesasPorEstado)} valueFormatter={formatCount} />
               </ChartCard>
               <ChartCard title="Convenios de pago por estado">
                 <HorizontalBarList
@@ -227,6 +286,18 @@ export const DashboardPage = () => {
                   secondaryFormatter={(v) => `Deuda: ${formatMoney(v)}`}
                 />
               </ChartCard>
+              <ChartCard title="Monto comprometido en promesas">
+                <DonutChart
+                  items={toStatusDatums(resumen.cobranza.promesasPorEstado, 'monto')}
+                  valueFormatter={formatMoney}
+                  centerCaption="Comprometido"
+                />
+              </ChartCard>
+              <div className="lg:col-span-2">
+                <ChartCard title="Deuda en convenios por estado">
+                  <StackedBar items={toStatusDatums(resumen.cobranza.conveniosPorEstado, 'monto')} valueFormatter={formatMoney} />
+                </ChartCard>
+              </div>
             </div>
           </ModuleSection>
 
@@ -252,12 +323,34 @@ export const DashboardPage = () => {
                   secondaryFormatter={(v) => `Monto: ${formatMoney(v)}`}
                 />
               </ChartCard>
+              <div className="lg:col-span-3">
+                <ChartCard title="Monto de notas de crédito por estado">
+                  <StackedBar
+                    items={toStatusDatums(resumen.credito.notasCreditoPorEstado, 'monto')}
+                    valueFormatter={formatMoney}
+                  />
+                </ChartCard>
+              </div>
             </div>
           </ModuleSection>
 
           {/* Pagos */}
           <ModuleSection module="pagos">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <ChartCard title="Pagos por estado (cantidad)">
+                <DonutChart items={toStatusDatums(resumen.pagos.porEstado)} valueFormatter={formatCount} centerCaption="Pagos" />
+              </ChartCard>
+              <ChartCard title="Pagos aplicados por mes">
+                <VerticalBarChart
+                  items={resumen.pagos.aplicadoPorMes.map((p) => ({
+                    key: p.mes,
+                    label: p.mes.slice(5),
+                    value: p.monto,
+                    color: MODULES.pagos.color,
+                  }))}
+                  valueFormatter={formatMoney}
+                />
+              </ChartCard>
               <ChartCard title="Pagos por estado">
                 <HorizontalBarList
                   items={toStatusBars(resumen.pagos.porEstado)}
@@ -281,12 +374,17 @@ export const DashboardPage = () => {
 
           {/* Organización */}
           <ModuleSection module="organizacion">
-            <ChartCard title="Rutas por estado">
-              <HorizontalBarList
-                items={toRutaEstadoBars(resumen.organizacion.rutasPorEstado)}
-                valueFormatter={formatCount}
-              />
-            </ChartCard>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <ChartCard title="Rutas por estado">
+                <HorizontalBarList
+                  items={toRutaEstadoBars(resumen.organizacion.rutasPorEstado)}
+                  valueFormatter={formatCount}
+                />
+              </ChartCard>
+              <ChartCard title="Distribución de rutas">
+                <DonutChart items={toRutaEstadoBars(resumen.organizacion.rutasPorEstado)} valueFormatter={formatCount} centerCaption="Rutas" />
+              </ChartCard>
+            </div>
           </ModuleSection>
         </>
       )}

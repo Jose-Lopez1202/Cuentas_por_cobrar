@@ -6,6 +6,9 @@ import MainLayout from '../layouts/MainLayout';
 import { CxcAppLayout } from '../modules/cxc/shared/CxcAppLayout';
 import { DashboardPage } from '../modules/cxc/dashboard/DashboardPage';
 
+// --- CXC / Tutoriales ---
+import { TutorialsPage } from '../modules/cxc/tutoriales';
+
 // --- CXC / Reportes ---
 import { ReportesLayout } from '../modules/cxc/reportes/ReportesLayout';
 import { AntiguedadSaldosPage } from '../modules/cxc/reportes/AntiguedadSaldosPage';
@@ -56,6 +59,18 @@ export const routes: RouteObject[] = [
       <MainLayout>
         <CxcAppLayout>
           <DashboardPage />
+        </CxcAppLayout>
+      </MainLayout>
+    ),
+  },
+
+  // --- CXC / Tutoriales ---
+  {
+    path: '/cxc/tutoriales',
+    element: (
+      <MainLayout>
+        <CxcAppLayout>
+          <TutorialsPage />
         </CxcAppLayout>
       </MainLayout>
     ),

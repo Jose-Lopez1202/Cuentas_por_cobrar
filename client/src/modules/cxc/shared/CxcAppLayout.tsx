@@ -7,6 +7,8 @@ import {
   Coins,
   CreditCard,
   FileSpreadsheet,
+  GraduationCap,
+  HelpCircle,
   Landmark,
   LayoutDashboard,
   LogOut,
@@ -17,6 +19,14 @@ import {
   WalletCards,
   type LucideIcon,
 } from 'lucide-react';
+import {
+  TutorialTour,
+  getTutorialForPath,
+  markCompleted,
+  START_TUTORIAL_STATE_KEY,
+  TUTORIALS,
+  type Tutorial,
+} from '../tutoriales';
 
 type CxcMenuItem = {
   id: string;
@@ -114,6 +124,7 @@ const CXC_GROUPS: CxcMenuGroup[] = [
 ];
 
 const CXC_DASHBOARD_PATH = '/cxc/dashboard';
+const CXC_TUTORIALS_PATH = '/cxc/tutoriales';
 
 const MAIN_MODULES = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -133,14 +144,38 @@ export const CxcAppLayout = ({ children }: CxcAppLayoutProps) => {
   const navigate = useNavigate();
 
   const isDashboardActive = location.pathname === CXC_DASHBOARD_PATH;
+  const isTutorialsActive = location.pathname === CXC_TUTORIALS_PATH;
 
   const activeGroup = useMemo(
     () =>
-      isDashboardActive
+      isDashboardActive || isTutorialsActive
         ? undefined
         : CXC_GROUPS.find((group) => location.pathname.startsWith(group.matchPrefix)) ?? CXC_GROUPS[0],
-    [location.pathname, isDashboardActive],
+    [location.pathname, isDashboardActive, isTutorialsActive],
   );
+
+  const pageTutorial = useMemo(() => getTutorialForPath(location.pathname), [location.pathname]);
+  const [runningTutorial, setRunningTutorial] = useState<Tutorial | null>(null);
+
+  // Lanzamiento desde la página de tutoriales: llega el id por el estado de navegación.
+  useEffect(() => {
+    const requested = (location.state as Record<string, unknown> | null)?.[START_TUTORIAL_STATE_KEY];
+    if (typeof requested !== 'string') return;
+    const tutorial = TUTORIALS.find((t) => t.id === requested);
+    // Limpia el estado para que recargar o volver atrás no relance el tour.
+    navigate(location.pathname, { replace: true, state: null });
+    if (tutorial) setRunningTutorial(tutorial);
+  }, [location.state, location.pathname, navigate]);
+
+  // Un tour pertenece a su pantalla: si se navega a otra, se cierra.
+  useEffect(() => {
+    setRunningTutorial((current) => (current && current.id === getTutorialForPath(location.pathname)?.id ? current : null));
+  }, [location.pathname]);
+
+  const closeTutorial = (completed: boolean) => {
+    if (completed && runningTutorial) markCompleted(runningTutorial.id);
+    setRunningTutorial(null);
+  };
 
   const [cxcOpen, setCxcOpen] = useState(true);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() =>
@@ -234,6 +269,20 @@ export const CxcAppLayout = ({ children }: CxcAppLayoutProps) => {
                       <span className="flex-1 text-left">Dashboard</span>
                     </button>
 
+                    <button
+                      type="button"
+                      onClick={() => navigate(CXC_TUTORIALS_PATH)}
+                      className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                        isTutorialsActive
+                          ? 'text-blue-300 bg-slate-800/80'
+                          : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/50'
+                      }`}
+                      aria-current={isTutorialsActive ? 'page' : undefined}
+                    >
+                      <GraduationCap size={15} aria-hidden="true" />
+                      <span className="flex-1 text-left">Tutoriales</span>
+                    </button>
+
                     {CXC_GROUPS.map((group) => {
                       const GroupIcon = group.icon;
                       const groupActive = activeGroup?.id === group.id;
@@ -305,18 +354,31 @@ export const CxcAppLayout = ({ children }: CxcAppLayoutProps) => {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header className="h-16 shrink-0 bg-white border-b border-slate-200 px-6 flex items-center" aria-label="Contexto de navegación">
+        <header className="h-16 shrink-0 bg-white border-b border-slate-200 px-6 flex items-center justify-between gap-4" aria-label="Contexto de navegación">
           <div className="min-w-0">
             <p className="text-[11px] uppercase tracking-wider font-semibold text-slate-400">Cuentas por Cobrar</p>
             <h2 className="text-sm font-semibold text-slate-800 truncate">
-              {isDashboardActive ? 'Dashboard' : activeGroup?.label}
+              {isDashboardActive ? 'Dashboard' : isTutorialsActive ? 'Tutoriales' : activeGroup?.label}
             </h2>
           </div>
+          {pageTutorial && (
+            <button
+              type="button"
+              onClick={() => setRunningTutorial(pageTutorial)}
+              className="h-9 px-3 shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              aria-label={`Iniciar tutorial: ${pageTutorial.title}`}
+            >
+              <HelpCircle size={16} className="text-blue-600" aria-hidden="true" />
+              Tutorial
+            </button>
+          )}
         </header>
         <main id="main-content" className="flex-1 overflow-y-auto p-6 bg-slate-50" tabIndex={-1}>
           {children}
         </main>
       </div>
+
+      {runningTutorial && <TutorialTour key={runningTutorial.id} tutorial={runningTutorial} onClose={closeTutorial} />}
     </div>
   );
 };
