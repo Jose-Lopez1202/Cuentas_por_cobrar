@@ -13,6 +13,10 @@ export const anticipoSchema = z.object({
   montoDisponible: z.number(),
   fecha: z.string(),
   estado: z.enum(ESTADOS_ANTICIPO),
+  idEmpleadoAnulacion: z.number().int().nullable(),
+  nombreEmpleadoAnulacion: z.string().nullable().optional(),
+  fechaAnulacion: z.string().nullable(),
+  motivoAnulacion: z.string().nullable(),
 });
 export type Anticipo = z.infer<typeof anticipoSchema>;
 
@@ -22,7 +26,6 @@ const anticipoBaseSchema = z.object({
   montoOriginal: moneySchema('El monto original', true),
   montoDisponible: moneySchema('El monto disponible'),
   fecha: isoDateSchema('La fecha'),
-  estado: z.enum(ESTADOS_ANTICIPO).default('DISPONIBLE'),
 });
 
 export const createAnticipoSchema = anticipoBaseSchema.superRefine((value, ctx) => {
@@ -36,5 +39,14 @@ export const createAnticipoSchema = anticipoBaseSchema.superRefine((value, ctx) 
 });
 export type CreateAnticipoInput = z.infer<typeof createAnticipoSchema>;
 
+// ESTADO ya no se edita libremente vía update(): nace DISPONIBLE y solo el
+// motor financiero (aplicar/reversar) o anular() lo cambian después.
 export const updateAnticipoSchema = anticipoBaseSchema.partial();
 export type UpdateAnticipoInput = z.infer<typeof updateAnticipoSchema>;
+
+export const anularAnticipoSchema = z.object({
+  idEmpleadoAnulacion: z.number().int().positive('Selecciona el empleado que anula'),
+  motivoAnulacion: z.string().trim().min(10, 'Describe el motivo de la anulación (mínimo 10 caracteres)').max(250, 'El motivo no puede superar 250 caracteres'),
+  fechaAnulacion: isoDateSchema('La fecha de anulación').optional(),
+});
+export type AnularAnticipoInput = z.infer<typeof anularAnticipoSchema>;

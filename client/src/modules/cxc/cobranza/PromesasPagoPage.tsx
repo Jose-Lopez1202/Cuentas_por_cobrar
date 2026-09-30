@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, AlertTriangle } from 'lucide-react';
 import { DataTable, StatusBadge, Button, TextInput } from '../../../shared/ui-kit';
 import { Modal } from '../../../shared/components';
 import { ConfirmDialog } from '../../../shared/components/ConfirmDialog';
@@ -74,7 +74,20 @@ export const PromesasPagoPage = () => {
           { header: 'Monto', accessorKey: 'montoComprometido', cell: ({ value }: any) => `Q ${Number(value).toFixed(2)}` },
           {
             header: 'Estado',
-            cell: ({ row }: any) => <StatusBadge status={row.estado} />,
+            cell: ({ row }: any) => (
+              <div className="flex items-center gap-1.5">
+                <StatusBadge status={row.estado} />
+                {row.estaVencida && (
+                  <span
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-600"
+                    title="La fecha comprometida ya pasó sin marcarse cumplida o incumplida"
+                  >
+                    <AlertTriangle size={12} />
+                    Vencida
+                  </span>
+                )}
+              </div>
+            ),
           },
           {
             header: '',

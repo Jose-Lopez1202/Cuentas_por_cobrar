@@ -30,6 +30,15 @@ router.get('/clientes/:idCliente/documentos-pendientes', async (req: Request, re
   }
 });
 
+router.get('/clientes/:idCliente/anticipos-disponibles', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const anticipos = await catalogosRepository.listAnticiposDisponiblesPorCliente(Number(req.params.idCliente));
+    res.json(anticipos);
+  } catch (err) {
+    next(err);
+  }
+});
+
 
 router.get('/monedas', async (_req: Request, res: Response, next: NextFunction) => {
   try {

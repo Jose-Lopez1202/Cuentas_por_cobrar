@@ -26,6 +26,10 @@ export const notaCreditoSchema = z.object({
   montoDisponible: z.number().optional(),
   // string para tolerar ACTIVA en datos heredados mientras se normaliza BD.
   estado: z.string(),
+  idEmpleadoAnulacion: z.number().int().nullable(),
+  nombreEmpleadoAnulacion: z.string().nullable().optional(),
+  fechaAnulacion: z.string().nullable(),
+  motivoAnulacion: z.string().nullable(),
 });
 
 export type NotaCredito = z.infer<typeof notaCreditoSchema>;
@@ -49,3 +53,10 @@ export type CreateNotaCreditoInput = z.infer<typeof createNotaCreditoSchema>;
 /** El estado se deriva de las aplicaciones; no se edita desde el CRUD. */
 export const updateNotaCreditoSchema = notaCreditoBaseSchema.partial();
 export type UpdateNotaCreditoInput = z.infer<typeof updateNotaCreditoSchema>;
+
+export const anularNotaCreditoSchema = z.object({
+  idEmpleadoAnulacion: z.number().int().positive('Selecciona el empleado que anula'),
+  motivoAnulacion: z.string().trim().min(10, 'Describe el motivo de la anulación (mínimo 10 caracteres)').max(250, 'El motivo no puede superar 250 caracteres'),
+  fechaAnulacion: isoDateSchema('La fecha de anulación').optional(),
+});
+export type AnularNotaCreditoInput = z.infer<typeof anularNotaCreditoSchema>;

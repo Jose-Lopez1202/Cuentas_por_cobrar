@@ -5,6 +5,7 @@ import type {
   CreateCondicionCreditoInput,
   UpdateCondicionCreditoInput,
 } from '@erp/contracts';
+import { NotFoundError } from '../../../../shared/errors/AppError';
 
 interface CondicionCreditoRow {
   ID_CONDICION: number;
@@ -177,17 +178,21 @@ export async function update(
     binds.estado = input.estado;
   }
 
-  if (fields.length === 0) return;
+  if (fields.length === 0) {
+    if (!(await findById(id))) throw new NotFoundError(`Condición de crédito ${id} no encontrada`);
+    return;
+  }
 
   const conn = await getConnection();
 
   try {
-    await conn.execute(
+    const result = await conn.execute(
       `UPDATE CXC_CONDICIONES_CREDITO
        SET ${fields.join(', ')}
        WHERE ID_CONDICION = :id`,
       binds,
     );
+    if (!result.rowsAffected) throw new NotFoundError(`Condición de crédito ${id} no encontrada`);
 
     await conn.commit();
   } catch (err) {
@@ -202,11 +207,12 @@ export async function remove(id: number): Promise<void> {
   const conn = await getConnection();
 
   try {
-    await conn.execute(
+    const result = await conn.execute(
       `DELETE FROM CXC_CONDICIONES_CREDITO
        WHERE ID_CONDICION = :id`,
       { id },
     );
+    if (!result.rowsAffected) throw new NotFoundError(`Condición de crédito ${id} no encontrada`);
 
     await conn.commit();
   } catch (err) {

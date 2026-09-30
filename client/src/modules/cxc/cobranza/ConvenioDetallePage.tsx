@@ -1,12 +1,12 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, DollarSign, Save, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, DollarSign, Save, X } from 'lucide-react';
 import { DataTable, StatusBadge, Button, TextInput, Select } from '../../../shared/ui-kit';
 import { Modal } from '../../../shared/components';
 import { apiClient, ApiError } from '../../../shared/api';
 import { formatDateGT } from '../../../shared/date';
 import { validateRequiredSelect, validateMoney, validateIdentifier, hasErrors, type ValidationErrors } from '../../../shared/validation';
-import type { ConvenioPago, ConvenioCuota, FormaPagoOption } from '@erp/contracts';
+import type { ConvenioPago, ConvenioCuota, ConvenioDocumento, FormaPagoOption, CatalogoOption } from '@erp/contracts';
 
 export const ConvenioDetallePage = () => {
   const { id } = useParams<{ id: string }>();
@@ -14,7 +14,9 @@ export const ConvenioDetallePage = () => {
 
   const [convenio, setConvenio] = useState<ConvenioPago | null>(null);
   const [cuotas, setCuotas] = useState<ConvenioCuota[]>([]);
+  const [documentos, setDocumentos] = useState<ConvenioDocumento[]>([]);
   const [formasPago, setFormasPago] = useState<FormaPagoOption[]>([]);
+  const [empleados, setEmpleados] = useState<CatalogoOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,6 +24,7 @@ export const ConvenioDetallePage = () => {
   const [montoPagado, setMontoPagado] = useState('');
   const [idFormaPago, setIdFormaPago] = useState('');
   const [referenciaPago, setReferenciaPago] = useState('');
+  const [idEmpleado, setIdEmpleado] = useState('');
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [isPaying, setIsPaying] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
@@ -33,10 +36,12 @@ export const ConvenioDetallePage = () => {
     Promise.all([
       apiClient.get<ConvenioPago>(`/cxc/convenios-pago/${id}`),
       apiClient.get<ConvenioCuota[]>(`/cxc/convenios-pago/${id}/cuotas`),
+      apiClient.get<ConvenioDocumento[]>(`/cxc/convenios-pago/${id}/documentos`),
     ])
-      .then(([conv, cuotasList]) => {
+      .then(([conv, cuotasList, documentosList]) => {
         setConvenio(conv);
         setCuotas(cuotasList);
+        setDocumentos(documentosList);
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : 'No se pudo cargar el convenio'))
       .finally(() => setIsLoading(false));
@@ -48,6 +53,7 @@ export const ConvenioDetallePage = () => {
 
   useEffect(() => {
     apiClient.get<FormaPagoOption[]>('/cxc/catalogos/formas-pago').then(setFormasPago).catch(() => setFormasPago([]));
+    apiClient.get<CatalogoOption[]>('/cxc/catalogos/empleados').then(setEmpleados).catch(() => setEmpleados([]));
   }, []);
 
   const formaPagoSeleccionada = formasPago.find((f) => f.id === Number(idFormaPago));
@@ -57,6 +63,7 @@ export const ConvenioDetallePage = () => {
     setMontoPagado(String(cuota.saldo));
     setIdFormaPago('');
     setReferenciaPago('');
+    setIdEmpleado('');
     setErrors({});
     setPayError(null);
   };
@@ -78,6 +85,9 @@ export const ConvenioDetallePage = () => {
     const formaPagoErr = validateRequiredSelect(idFormaPago, 'una forma de pago');
     if (formaPagoErr) next.idFormaPago = formaPagoErr;
 
+    const empleadoErr = validateRequiredSelect(idEmpleado, 'el empleado que registra el pago');
+    if (empleadoErr) next.idEmpleado = empleadoErr;
+
     // La referencia es obligatoria SOLO si la forma de pago elegida lo exige
     // (cheque, transferencia, depósito...) — efectivo, por ejemplo, no.
     if (formaPagoSeleccionada?.requiereReferencia && (!referenciaPago || referenciaPago.trim() === '')) {
@@ -94,6 +104,7 @@ export const ConvenioDetallePage = () => {
     montoPagado,
     idFormaPago,
     referenciaPago,
+    idEmpleado,
     cuotaAPagar,
     formaPagoSeleccionada,
   ]);
@@ -116,6 +127,7 @@ export const ConvenioDetallePage = () => {
         montoPagado: Number(montoPagado),
         idFormaPago: Number(idFormaPago),
         referenciaPago: referenciaPago || undefined,
+        idEmpleado: Number(idEmpleado),
       });
       setCuotaAPagar(null);
       cargar();
@@ -184,7 +196,20 @@ export const ConvenioDetallePage = () => {
           { header: 'Forma de pago', cell: ({ row }: any) => row.nombreFormaPago ?? '—' },
           {
             header: 'Estado',
-            cell: ({ row }: any) => <StatusBadge status={row.estado} />,
+            cell: ({ row }: any) => (
+              <div className="flex items-center gap-1.5">
+                <StatusBadge status={row.estado} />
+                {row.estaVencida && (
+                  <span
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-600"
+                    title="La fecha de vencimiento ya pasó sin registrar el pago completo"
+                  >
+                    <AlertTriangle size={12} />
+                    Vencida
+                  </span>
+                )}
+              </div>
+            ),
           },
           {
             header: '',
@@ -202,11 +227,27 @@ export const ConvenioDetallePage = () => {
         ]}
       />
 
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">Documentos que cubre el convenio</h2>
+          <p className="text-sm text-slate-500">Al pagar una cuota, el monto se distribuye entre estos documentos (el más antiguo primero) y les reduce el saldo real.</p>
+        </div>
+        <DataTable
+          data={documentos}
+          emptyText="Este convenio no tiene documentos vinculados"
+          columns={[
+            { header: 'Documento', accessorKey: 'referenciaDocumento' },
+            { header: 'Monto incluido en el convenio', accessorKey: 'montoIncluido', cell: ({ value }: any) => `Q ${Number(value).toFixed(2)}` },
+            { header: 'Saldo real actual', accessorKey: 'saldoActualDocumento', cell: ({ value }: any) => `Q ${Number(value ?? 0).toFixed(2)}` },
+          ]}
+        />
+      </section>
+
       <Modal
         isOpen={!!cuotaAPagar}
         onClose={() => setCuotaAPagar(null)}
         title={`Registrar pago — Cuota ${cuotaAPagar?.numeroCuota}`}
-        description={`Saldo actual: Q ${Number(cuotaAPagar?.saldo ?? 0).toFixed(2)}`}
+        description={`Saldo actual: Q ${Number(cuotaAPagar?.saldo ?? 0).toFixed(2)}. Se aplicará al saldo real de los documentos del convenio.`}
         size="sm"
       >
         <div className="flex flex-col gap-4">
@@ -233,6 +274,16 @@ export const ConvenioDetallePage = () => {
             options={formasPago.map((f) => ({ value: f.id, label: f.label }))}
             error={errors.idFormaPago}
             helperText="Cómo se recibió el pago de esta cuota."
+          />
+
+          <Select
+            label="Empleado"
+            required
+            value={idEmpleado}
+            onChange={(e: any) => setIdEmpleado(e.target.value)}
+            options={empleados.map((e) => ({ value: e.id, label: e.label }))}
+            error={errors.idEmpleado}
+            helperText="Empleado responsable de registrar el pago."
           />
 
           {formaPagoSeleccionada && (

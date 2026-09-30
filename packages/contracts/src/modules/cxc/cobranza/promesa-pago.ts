@@ -14,6 +14,10 @@ export const promesaPagoSchema = z.object({
   montoComprometido: z.number(),
   estado: z.enum(ESTADOS_PROMESA_PAGO),
   observaciones: z.string().nullable(),
+  // Calculado al leer, nunca persistido: PENDIENTE cuya fechaCompromiso ya
+  // pasó. No sobreescribe `estado` (que sigue siendo autoridad del CRUD),
+  // es una señal visual adicional. Mismo patrón que Documento.condicion.
+  estaVencida: z.boolean(),
 });
 export type PromesaPago = z.infer<typeof promesaPagoSchema>;
 

@@ -35,11 +35,13 @@ export const DocumentoForm = ({ documento, onSuccess, onCancel }: Props) => {
   const [clientes, setClientes] = useState<DocumentoCatalogoOption[]>([]);
   const [tipos, setTipos] = useState<DocumentoCatalogoOption[]>([]);
   const [monedas, setMonedas] = useState<DocumentoCatalogoOption[]>([]);
+  const [condicionesCredito, setCondicionesCredito] = useState<DocumentoCatalogoOption[]>([]);
 
   const [idCliente, setIdCliente] = useState(documento?.idCliente?.toString() ?? '');
   const [nitCliente, setNitCliente] = useState(documento?.nitCliente ?? '');
   const [idTipoDocumento, setIdTipoDocumento] = useState(documento?.idTipoDocumento?.toString() ?? '');
   const [idMoneda, setIdMoneda] = useState(documento?.idMoneda?.toString() ?? '');
+  const [idCondicionCredito, setIdCondicionCredito] = useState(documento?.idCondicionCredito?.toString() ?? '');
   const [serie, setSerie] = useState(documento?.serie ?? '');
   const [numeroDocumento, setNumeroDocumento] = useState(documento?.numeroDocumento ?? '');
   const [fechaDocumento, setFechaDocumento] = useState(documento?.fechaDocumento?.slice(0, 10) ?? '');
@@ -55,11 +57,13 @@ export const DocumentoForm = ({ documento, onSuccess, onCancel }: Props) => {
       apiClient.get<DocumentoCatalogoOption[]>('/cxc/documentos/catalogos/clientes'),
       apiClient.get<DocumentoCatalogoOption[]>('/cxc/documentos/catalogos/tipos-documento'),
       apiClient.get<DocumentoCatalogoOption[]>('/cxc/documentos/catalogos/monedas'),
+      apiClient.get<DocumentoCatalogoOption[]>('/cxc/documentos/catalogos/condiciones-credito'),
     ])
-      .then(([clientesData, tiposData, monedasData]) => {
+      .then(([clientesData, tiposData, monedasData, condicionesData]) => {
         setClientes(clientesData);
         setTipos(tiposData);
         setMonedas(monedasData);
+        setCondicionesCredito(condicionesData);
 
         if (documento?.idCliente) {
           const selected = clientesData.find((c) => c.id === documento.idCliente);
@@ -70,6 +74,7 @@ export const DocumentoForm = ({ documento, onSuccess, onCancel }: Props) => {
         setClientes([]);
         setTipos([]);
         setMonedas([]);
+        setCondicionesCredito([]);
       });
   }, [documento?.idCliente]);
 
@@ -148,6 +153,7 @@ export const DocumentoForm = ({ documento, onSuccess, onCancel }: Props) => {
       idCliente: Number(idCliente),
       idTipoDocumento: Number(idTipoDocumento),
       idMoneda: Number(idMoneda),
+      idCondicionCredito: idCondicionCredito ? Number(idCondicionCredito) : null,
       serie: serie.trim() || undefined,
       numeroDocumento: numeroDocumento.trim(),
       fechaDocumento,
@@ -290,6 +296,16 @@ export const DocumentoForm = ({ documento, onSuccess, onCancel }: Props) => {
           isReadOnly={isLocked}
         />
       </div>
+
+      <Select
+        label="Condición de crédito"
+        value={idCondicionCredito}
+        onChange={(e: any) => setIdCondicionCredito(e.target.value)}
+        options={condicionesCredito.map((c) => ({ value: c.id, label: c.label }))}
+        placeholder="Sin condición (no genera mora automática)"
+        helperText="Opcional. Si se asigna, el documento entra al recálculo automático de mora al vencerse."
+        isReadOnly={isLocked}
+      />
 
       <TextInput
         label="Total"

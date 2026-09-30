@@ -59,13 +59,11 @@ export async function updateCondicion(
 ): Promise<CondicionCredito> {
   const input = updateCondicionCreditoSchema.parse(rawInput);
 
-  await getCondicion(id);
   await condicionCreditoRepository.update(id, input);
 
   return getCondicion(id);
 }
 
 export async function deleteCondicion(id: number): Promise<void> {
-  await getCondicion(id);
   await condicionCreditoRepository.remove(id);
 }

@@ -5,6 +5,7 @@ import type {
   CreateTipoDocumentoInput,
   UpdateTipoDocumentoInput,
 } from '@erp/contracts';
+import { NotFoundError } from '../../../../shared/errors/AppError';
 
 interface TipoDocumentoRow {
   ID_TIPO_DOCUMENTO: number;
@@ -114,14 +115,18 @@ export async function update(id: number, input: UpdateTipoDocumentoInput): Promi
   if (input.naturaleza !== undefined) { fields.push('NATURALEZA = :naturaleza'); binds.naturaleza = input.naturaleza; }
   if (input.estado !== undefined) { fields.push('ESTADO = :estado'); binds.estado = input.estado; }
 
-  if (fields.length === 0) return;
+  if (fields.length === 0) {
+    if (!(await findById(id))) throw new NotFoundError(`Tipo de documento ${id} no encontrado`);
+    return;
+  }
 
   const conn = await getConnection();
   try {
-    await conn.execute(
+    const result = await conn.execute(
       `UPDATE CXC_TIPOS_DOCUMENTO SET ${fields.join(', ')} WHERE ID_TIPO_DOCUMENTO = :id`,
       binds,
     );
+    if (!result.rowsAffected) throw new NotFoundError(`Tipo de documento ${id} no encontrado`);
     await conn.commit();
   } catch (err) {
     await conn.rollback();
@@ -134,10 +139,11 @@ export async function update(id: number, input: UpdateTipoDocumentoInput): Promi
 export async function remove(id: number): Promise<void> {
   const conn = await getConnection();
   try {
-    await conn.execute(
+    const result = await conn.execute(
       `DELETE FROM CXC_TIPOS_DOCUMENTO WHERE ID_TIPO_DOCUMENTO = :id`,
       { id },
     );
+    if (!result.rowsAffected) throw new NotFoundError(`Tipo de documento ${id} no encontrado`);
     await conn.commit();
   } catch (err) {
     await conn.rollback();

@@ -1,6 +1,6 @@
 import type { FC } from 'react';
 
-type Tone = 'green' | 'yellow' | 'red' | 'orange' | 'gray' | 'blue';
+export type Tone = 'green' | 'yellow' | 'red' | 'orange' | 'gray' | 'blue';
 
 type UnifiedStatusBadgeProps = {
   status?: string | null;
@@ -34,6 +34,9 @@ const STATUS_TONES: Record<string, Tone> = {
   APLICADO: 'green',
   APLICADA: 'green',
   EMITIDO: 'green',
+  CONFIRMADA: 'green',
+  CONFIRMADO: 'green',
+  EN_2DA_APROBACION: 'blue',
   REVERSADO: 'gray',
   REVERSADA: 'gray',
 
@@ -109,6 +112,23 @@ const TONE_CLASSES: Record<Tone, { badge: string; dot: string }> = {
   },
 };
 
+/** Hex de cada tono, para usarlo en gráficas y mantenerlas alineadas con las
+ * mismas badges de estado que ya se ven en las tablas de todo CxC. */
+export const TONE_HEX: Record<Tone, string> = {
+  green: '#10b981',
+  yellow: '#f59e0b',
+  red: '#ef4444',
+  orange: '#f97316',
+  gray: '#94a3b8',
+  blue: '#3b82f6',
+};
+
+/** Resuelve el tono de un valor de ESTADO usando la misma tabla que las badges. */
+export function getStatusTone(status?: string | null): Tone {
+  const key = LEGACY_ALIASES[normalize(status)] ?? normalize(status);
+  return STATUS_TONES[key] ?? 'gray';
+}
+
 const LEGACY_ALIASES: Record<string, string> = {
   APROBADO: 'ACTIVO',
   APROBADA: 'ACTIVA',
@@ -136,6 +156,9 @@ const DISPLAY_LABELS: Record<string, string> = {
   APLICADO: 'Aplicado',
   APLICADA: 'Aplicada',
   EMITIDO: 'Emitido',
+  CONFIRMADA: 'Confirmada',
+  CONFIRMADO: 'Confirmado',
+  EN_2DA_APROBACION: '1ra aprobación',
   REVERSADO: 'Reversado',
   REVERSADA: 'Reversada',
   VENCIDO: 'Vencido',
@@ -172,6 +195,12 @@ const formatFallbackLabel = (value: string) =>
     .replace(/_/g, ' ')
     .toLocaleLowerCase('es-GT')
     .replace(/^./, (char) => char.toLocaleUpperCase('es-GT'));
+
+/** Mismo texto legible que muestra la badge, para reusar en gráficas. */
+export function getStatusLabel(status?: string | null): string {
+  const key = normalize(status);
+  return DISPLAY_LABELS[key] ?? formatFallbackLabel(key || 'SIN ESTADO');
+}
 
 export const UnifiedStatusBadge: FC<UnifiedStatusBadgeProps> = ({
   status,

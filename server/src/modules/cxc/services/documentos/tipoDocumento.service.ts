@@ -33,12 +33,10 @@ export async function createTipoDocumento(rawInput: unknown): Promise<TipoDocume
 
 export async function updateTipoDocumento(id: number, rawInput: unknown): Promise<TipoDocumento> {
   const input = updateTipoDocumentoSchema.parse(rawInput);
-  await getTipoDocumento(id);
   await tipoDocumentoRepository.update(id, input);
   return getTipoDocumento(id);
 }
 
 export async function deleteTipoDocumento(id: number): Promise<void> {
-  await getTipoDocumento(id);
   await tipoDocumentoRepository.remove(id);
 }

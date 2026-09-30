@@ -37,13 +37,11 @@ export async function createEmpresa(rawInput: unknown): Promise<Empresa> {
 
 export async function updateEmpresa(id: number, rawInput: unknown): Promise<Empresa> {
   const input = updateEmpresaSchema.parse(rawInput);
-  await getEmpresa(id); // 404 temprano si no existe
   await empresaRepository.update(id, input);
   return getEmpresa(id);
 }
 
 export async function deleteEmpresa(id: number): Promise<void> {
-  await getEmpresa(id); // 404 temprano si no existe
   await empresaRepository.remove(id);
 }
 

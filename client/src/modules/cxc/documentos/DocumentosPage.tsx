@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, Search, Eye } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Eye, Ban } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { DataTable, StatusBadge, Button, TextInput } from '../../../shared/ui-kit';
-import { Modal } from '../../../shared/components';
+import { Modal, TrazabilidadActionModal } from '../../../shared/components';
 import { ConfirmDialog } from '../../../shared/components/ConfirmDialog';
 import { usePaginatedList } from '../../../shared/hooks';
 import { apiClient, ApiError } from '../../../shared/api';
@@ -19,6 +19,7 @@ export const DocumentosPage = () => {
   const [modalState, setModalState] = useState<{ mode: 'create' | 'edit'; documento?: Documento } | null>(null);
   const [documentoAEliminar, setDocumentoAEliminar] = useState<Documento | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [aAnular, setAAnular] = useState<Documento | null>(null);
 
   const { data, meta, isLoading, error, refetch } = usePaginatedList<Documento>(
     '/cxc/documentos',
@@ -86,31 +87,42 @@ export const DocumentosPage = () => {
           {
             header: '',
             align: 'right',
-            cell: ({ row }: any) => (
-              <div className="flex justify-end gap-1">
-                <button
-                  onClick={() => navigate(`/cxc/documentos/documentos/${row.idDocumento}`)}
-                  className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
-                  title="Ver detalle"
-                >
-                  <Eye size={15} />
-                </button>
-                <button
-                  onClick={() => setModalState({ mode: 'edit', documento: row })}
-                  className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
-                  title="Editar"
-                >
-                  <Pencil size={15} />
-                </button>
-                <button
-                  onClick={() => setDocumentoAEliminar(row)}
-                  className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                  title="Eliminar"
-                >
-                  <Trash2 size={15} />
-                </button>
-              </div>
-            ),
+            cell: ({ row }: any) => {
+              const anulable = !['ANULADO', 'ANULADA', 'PAGADO', 'PAGADA'].includes(String(row.estado).toUpperCase());
+              return (
+                <div className="flex justify-end gap-1">
+                  <button
+                    onClick={() => navigate(`/cxc/documentos/documentos/${row.idDocumento}`)}
+                    className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
+                    title="Ver detalle"
+                  >
+                    <Eye size={15} />
+                  </button>
+                  <button
+                    onClick={() => setModalState({ mode: 'edit', documento: row })}
+                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                    title="Editar"
+                  >
+                    <Pencil size={15} />
+                  </button>
+                  <button
+                    onClick={() => !anulable ? undefined : setAAnular(row)}
+                    disabled={!anulable}
+                    className={`p-1.5 rounded-md transition-colors ${anulable ? 'text-slate-400 hover:text-amber-700 hover:bg-amber-50' : 'text-slate-300 cursor-not-allowed'}`}
+                    title={anulable ? 'Anular documento' : 'No se puede anular un documento pagado o ya anulado'}
+                  >
+                    <Ban size={15} />
+                  </button>
+                  <button
+                    onClick={() => setDocumentoAEliminar(row)}
+                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                    title="Eliminar"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              );
+            },
           },
         ]}
         paginationProps={{
@@ -143,6 +155,21 @@ export const DocumentosPage = () => {
         confirmLabel="Eliminar"
         isLoading={isDeleting}
       />
+
+      {aAnular && (
+        <TrazabilidadActionModal
+          title={`Anular documento ${[aAnular.serie, aAnular.numeroDocumento].filter(Boolean).join('-')}`}
+          description="El saldo pendiente del documento se llevará a cero. No se revierten los pagos/notas/anticipos ya aplicados a él."
+          endpoint={`/cxc/documentos/${aAnular.idDocumento}/anular`}
+          actionLabel="Anular"
+          empleadoLabel="Empleado que anula"
+          empleadoFieldName="idEmpleadoAnulacion"
+          motivoLabel="Motivo de la anulación"
+          motivoFieldName="motivoAnulacion"
+          onClose={() => setAAnular(null)}
+          onSuccess={() => { setAAnular(null); refetch(); }}
+        />
+      )}
     </div>
   );
 };

@@ -1,6 +1,7 @@
 import oracledb from 'oracledb';
 import { getConnection } from '../../../../config/database';
 import type { PromesaPago, CreatePromesaPagoInput, UpdatePromesaPagoInput } from '@erp/contracts';
+import { businessTodayIso } from '../../../../shared/date';
 
 interface PromesaPagoRow {
   ID_PROMESA: number;
@@ -16,6 +17,15 @@ interface PromesaPagoRow {
 }
 
 function mapRow(row: PromesaPagoRow): PromesaPago {
+  const estado = row.ESTADO as PromesaPago['estado'];
+  const fechaCompromiso = row.FECHA_COMPROMISO?.toISOString() ?? null;
+
+  // Nada transiciona PENDIENTE -> INCUMPLIDA automáticamente (no hay
+  // job/trigger); esto es solo una señal de lectura para la UI, calculada
+  // igual que Documento.condicion. `estado` sigue siendo lo único que el
+  // CRUD puede editar.
+  const estaVencida = estado === 'PENDIENTE' && !!fechaCompromiso && fechaCompromiso.slice(0, 10) < businessTodayIso();
+
   return {
     idPromesa: row.ID_PROMESA,
     idCliente: row.ID_CLIENTE,
@@ -23,10 +33,11 @@ function mapRow(row: PromesaPagoRow): PromesaPago {
     idDocumento: row.ID_DOCUMENTO,
     idGestion: row.ID_GESTION,
     fechaPromesa: row.FECHA_PROMESA?.toISOString() ?? '',
-    fechaCompromiso: row.FECHA_COMPROMISO?.toISOString() ?? null,
+    fechaCompromiso,
     montoComprometido: row.MONTO_COMPROMETIDO,
-    estado: row.ESTADO as PromesaPago['estado'],
+    estado,
     observaciones: row.OBSERVACIONES,
+    estaVencida,
   };
 }
 

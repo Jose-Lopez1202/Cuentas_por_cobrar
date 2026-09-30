@@ -5,6 +5,7 @@ import {
 } from '@erp/contracts';
 import * as documentoHistorialRepository from '../../repositories/documentos/documentoHistorial.repository';
 import { NotFoundError, getDocumento } from './documento.service';
+import { ConflictError } from '../../../../shared/errors/AppError';
 
 export async function listHistorial(idDocumento: number): Promise<DocumentoHistorial[]> {
   await getDocumento(idDocumento);
@@ -25,13 +26,19 @@ export async function createHistorial(idDocumento: number, rawInput: unknown): P
 }
 
 export async function updateHistorial(id: number, rawInput: unknown): Promise<DocumentoHistorial> {
+  const current = await getHistorial(id);
+  if (current.tipoEvento) {
+    throw new ConflictError('Este registro fue generado automáticamente por el sistema; el historial automático es append-only y no se edita.');
+  }
   const input = updateDocumentoHistorialSchema.parse(rawInput);
-  await getHistorial(id);
   await documentoHistorialRepository.update(id, input);
   return getHistorial(id);
 }
 
 export async function deleteHistorial(id: number): Promise<void> {
-  await getHistorial(id);
+  const current = await getHistorial(id);
+  if (current.tipoEvento) {
+    throw new ConflictError('Este registro fue generado automáticamente por el sistema; el historial automático es append-only y no se elimina.');
+  }
   await documentoHistorialRepository.remove(id);
 }

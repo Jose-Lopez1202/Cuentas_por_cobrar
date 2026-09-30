@@ -37,12 +37,10 @@ export async function createSucursal(rawInput: unknown): Promise<Sucursal> {
 
 export async function updateSucursal(id: number, rawInput: unknown): Promise<Sucursal> {
   const input = updateSucursalSchema.parse(rawInput);
-  await getSucursal(id); // 404 temprano si no existe
   await sucursalRepository.update(id, input);
   return getSucursal(id);
 }
 
 export async function deleteSucursal(id: number): Promise<void> {
-  await getSucursal(id); // 404 temprano si no existe
   await sucursalRepository.remove(id);
 }

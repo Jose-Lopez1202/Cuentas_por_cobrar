@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Ban } from 'lucide-react';
 import { DataTable, StatusBadge, Button, TextInput } from '../../../shared/ui-kit';
-import { Modal } from '../../../shared/components';
+import { Modal, TrazabilidadActionModal } from '../../../shared/components';
 import { ConfirmDialog } from '../../../shared/components/ConfirmDialog';
 import { usePaginatedList } from '../../../shared/hooks';
 import { apiClient, ApiError } from '../../../shared/api';
@@ -18,6 +18,7 @@ export const PagosPage = () => {
   const [del, setDel] = useState<Pago | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [aAnular, setAAnular] = useState<Pago | null>(null);
   const { data, meta, isLoading, error, refetch } = usePaginatedList<Pago>('/cxc/pagos', { page, limit: 10, search });
 
   const remove = async () => {
@@ -79,6 +80,7 @@ export const PagosPage = () => {
             align: 'right',
             cell: ({ row }: any) => {
               const locked = Number(row.montoAplicado ?? 0) > 0.005 || ['APLICADO', 'REVERSADO', 'ANULADO'].includes(String(row.estado).toUpperCase());
+              const anulable = Number(row.montoAplicado ?? 0) <= 0.005 && String(row.estado).toUpperCase() !== 'ANULADO';
               return (
                 <div className="flex justify-end gap-1">
                   <button
@@ -87,6 +89,14 @@ export const PagosPage = () => {
                     title={locked ? 'Ver pago bloqueado por movimientos' : 'Editar pago'}
                   >
                     <Pencil size={15} />
+                  </button>
+                  <button
+                    onClick={() => anulable && setAAnular(row)}
+                    disabled={!anulable}
+                    className={`p-1.5 rounded-md ${anulable ? 'text-slate-400 hover:text-amber-700 hover:bg-amber-50' : 'text-slate-300 cursor-not-allowed'}`}
+                    title={anulable ? 'Anular pago' : 'Un pago con aplicaciones o ya anulado no se puede anular de nuevo'}
+                  >
+                    <Ban size={15} />
                   </button>
                   <button
                     onClick={() => !locked && setDel(row)}
@@ -122,6 +132,21 @@ export const PagosPage = () => {
         confirmLabel="Eliminar"
         isLoading={deleting}
       />
+
+      {aAnular && (
+        <TrazabilidadActionModal
+          title={`Anular pago #${aAnular.idPago}`}
+          description="El pago quedará marcado como anulado de forma permanente. Solo se puede anular un pago sin aplicaciones vigentes."
+          endpoint={`/cxc/pagos/${aAnular.idPago}/anular`}
+          actionLabel="Anular"
+          empleadoLabel="Empleado que anula"
+          empleadoFieldName="idEmpleadoAnulacion"
+          motivoLabel="Motivo de la anulación"
+          motivoFieldName="motivoAnulacion"
+          onClose={() => setAAnular(null)}
+          onSuccess={() => { setAAnular(null); refetch(); }}
+        />
+      )}
     </div>
   );
 };

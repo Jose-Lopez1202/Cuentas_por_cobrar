@@ -1,6 +1,9 @@
 import oracledb from 'oracledb';
 import { getConnection } from '../../../../config/database';
 import type { ConvenioPago, CreateConvenioPagoInput, UpdateConvenioPagoInput } from '@erp/contracts';
+import { ConflictError } from '../../../../shared/errors/AppError';
+import { EPSILON } from '../../shared/financialRules';
+import { businessTodayIso } from '../../../../shared/date';
 
 interface ConvenioPagoRow {
   ID_CONVENIO: number;
@@ -76,7 +79,16 @@ export async function findById(id: number): Promise<ConvenioPago | null> {
   }
 }
 
-export async function create(input: CreateConvenioPagoInput): Promise<number> {
+/**
+ * Crea el convenio y todas sus cuotas en una sola conexión/transacción:
+ * un solo commit al final, rollback completo si cualquier INSERT falla.
+ * Evita dejar un convenio sin cuotas ante un fallo a mitad de camino.
+ */
+export async function createConCuotas(
+  input: CreateConvenioPagoInput,
+  cuotas: Array<{ numeroCuota: number; fechaVencimiento: string; monto: number }>,
+  documentos: Array<{ idDocumento: number; montoIncluido: number }>,
+): Promise<number> {
   const conn = await getConnection();
   try {
     const result = await conn.execute<{ id: number[] }>(
@@ -95,8 +107,33 @@ export async function create(input: CreateConvenioPagoInput): Promise<number> {
         id: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER },
       },
     );
+    const idConvenio = result.outBinds!.id[0];
+
+    for (const cuota of cuotas) {
+      await conn.execute(
+        `INSERT INTO CXC_CONVENIO_CUOTAS
+           (ID_CONVENIO, NUMERO_CUOTA, FECHA_VENCIMIENTO, MONTO, SALDO, ESTADO)
+         VALUES
+           (:idConvenio, :numeroCuota, TO_DATE(:fechaVencimiento, 'YYYY-MM-DD'), :monto, :monto, 'PENDIENTE')`,
+        {
+          idConvenio,
+          numeroCuota: cuota.numeroCuota,
+          fechaVencimiento: cuota.fechaVencimiento,
+          monto: cuota.monto,
+        },
+      );
+    }
+
+    for (const doc of documentos) {
+      await conn.execute(
+        `INSERT INTO CXC_CONVENIO_DOCUMENTOS (ID_CONVENIO, ID_DOCUMENTO, MONTO_INCLUIDO)
+         VALUES (:idConvenio, :idDocumento, :montoIncluido)`,
+        { idConvenio, idDocumento: doc.idDocumento, montoIncluido: doc.montoIncluido },
+      );
+    }
+
     await conn.commit();
-    return result.outBinds!.id[0];
+    return idConvenio;
   } catch (err) {
     await conn.rollback();
     throw err;
@@ -128,12 +165,59 @@ export async function update(id: number, input: UpdateConvenioPagoInput): Promis
   }
 }
 
+/**
+ * Solo se elimina físicamente un convenio "virgen" (ninguna de sus cuotas
+ * tiene pago registrado todavía). Uno con pagos debe cancelarse mediante
+ * update({estado:'CANCELADO'}), igual que el resto de entidades financieras
+ * del sistema (documentos, pagos, NC, ajustes) nunca se borran físicamente
+ * una vez que tuvieron movimiento.
+ */
 export async function remove(id: number): Promise<void> {
   const conn = await getConnection();
   try {
+    const result = await conn.execute<{ TOTAL: number }>(
+      `SELECT COUNT(*) TOTAL FROM CXC_CONVENIO_CUOTAS WHERE ID_CONVENIO = :id AND SALDO < MONTO`,
+      { id },
+    );
+    if (Number(result.rows?.[0]?.TOTAL ?? 0) > 0) {
+      throw new ConflictError('Este convenio ya tiene pagos registrados; no se puede eliminar físicamente. Cámbialo a CANCELADO en su lugar.');
+    }
+    await conn.execute(`DELETE FROM CXC_CONVENIO_DOCUMENTOS WHERE ID_CONVENIO = :id`, { id });
     await conn.execute(`DELETE FROM CXC_CONVENIO_CUOTAS WHERE ID_CONVENIO = :id`, { id });
     await conn.execute(`DELETE FROM CXC_CONVENIOS_PAGO WHERE ID_CONVENIO = :id`, { id });
     await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    await conn.close();
+  }
+}
+
+/**
+ * Botón manual (mismo patrón que Mora: no hay cron/job en el proyecto):
+ * marca INCUMPLIDO todo convenio ACTIVO que tenga al menos una cuota
+ * PENDIENTE cuya fecha de vencimiento ya pasó. Nunca toca convenios ya
+ * CUMPLIDO/CANCELADO/INCUMPLIDO.
+ */
+export async function recalcularIncumplidos(): Promise<number> {
+  const conn = await getConnection();
+  try {
+    const result = await conn.execute(
+      `UPDATE CXC_CONVENIOS_PAGO cv
+          SET ESTADO = 'INCUMPLIDO'
+        WHERE cv.ESTADO = 'ACTIVO'
+          AND EXISTS (
+            SELECT 1 FROM CXC_CONVENIO_CUOTAS cc
+             WHERE cc.ID_CONVENIO = cv.ID_CONVENIO
+               AND cc.ESTADO = 'PENDIENTE'
+               AND cc.SALDO > :epsilon
+               AND cc.FECHA_VENCIMIENTO < TO_DATE(:hoy, 'YYYY-MM-DD')
+          )`,
+      { epsilon: EPSILON, hoy: businessTodayIso() },
+    );
+    await conn.commit();
+    return result.rowsAffected ?? 0;
   } catch (err) {
     await conn.rollback();
     throw err;

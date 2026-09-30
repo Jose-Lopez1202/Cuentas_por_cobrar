@@ -3,7 +3,7 @@ import { businessTodayIso } from '../../../shared/date';
 export type DocumentoEstadoFinanciero = 'PENDIENTE' | 'PARCIAL' | 'PAGADO' | 'ANULADO';
 export type DocumentoCondicion = 'VIGENTE' | 'VENCIDA';
 
-const EPSILON = 0.005;
+export const EPSILON = 0.005;
 
 export function roundMoney(value: number): number {
   return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
@@ -46,4 +46,13 @@ export function deriveDocumentoCondicion(
 export function isDocumentoBloqueadoParaAplicacion(estado?: string | null): boolean {
   const normalized = String(estado ?? '').trim().toUpperCase();
   return ['PAGADO', 'PAGADA', 'ANULADO', 'ANULADA'].includes(normalized);
+}
+
+/**
+ * Un documento con movimientos financieros (saldo distinto del total) debe
+ * congelar su cabecera y sus líneas de detalle: las correcciones pasan por
+ * reversa/nota de crédito/ajuste, no por editar el registro original.
+ */
+export function hasFinancialMovement(total: number, saldo: number): boolean {
+  return Math.abs(Number(total) - Number(saldo)) > EPSILON;
 }

@@ -1,6 +1,7 @@
 import oracledb from 'oracledb';
 import { getConnection } from '../../../../config/database';
 import type { Empresa, CreateEmpresaInput, UpdateEmpresaInput } from '@erp/contracts';
+import { NotFoundError } from '../../../../shared/errors/AppError';
 
 interface EmpresaRow {
   ID_EMPRESA: number;
@@ -98,11 +99,15 @@ export async function update(id: number, input: UpdateEmpresaInput): Promise<voi
   if (input.nit !== undefined) { fields.push('NIT = :nit'); binds.nit = input.nit; }
   if (input.estado !== undefined) { fields.push('ESTADO = :estado'); binds.estado = input.estado; }
 
-  if (fields.length === 0) return;
+  if (fields.length === 0) {
+    if (!(await findById(id))) throw new NotFoundError(`Empresa ${id} no encontrada`);
+    return;
+  }
 
   const conn = await getConnection();
   try {
-    await conn.execute(`UPDATE CXC_EMPRESAS SET ${fields.join(', ')} WHERE ID_EMPRESA = :id`, binds);
+    const result = await conn.execute(`UPDATE CXC_EMPRESAS SET ${fields.join(', ')} WHERE ID_EMPRESA = :id`, binds);
+    if (!result.rowsAffected) throw new NotFoundError(`Empresa ${id} no encontrada`);
     await conn.commit();
   } catch (err) {
     await conn.rollback();
@@ -115,7 +120,8 @@ export async function update(id: number, input: UpdateEmpresaInput): Promise<voi
 export async function remove(id: number): Promise<void> {
   const conn = await getConnection();
   try {
-    await conn.execute(`DELETE FROM CXC_EMPRESAS WHERE ID_EMPRESA = :id`, { id });
+    const result = await conn.execute(`DELETE FROM CXC_EMPRESAS WHERE ID_EMPRESA = :id`, { id });
+    if (!result.rowsAffected) throw new NotFoundError(`Empresa ${id} no encontrada`);
     await conn.commit();
   } catch (err) {
     await conn.rollback();

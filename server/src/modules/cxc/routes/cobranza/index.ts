@@ -21,13 +21,15 @@ router.delete('/promesas-pago/:id', promesaPagoController.remove);
 
 // --- Convenios de pago (las cuotas se generan automáticamente al crear) ---
 router.get('/convenios-pago', convenioPagoController.list);
+router.post('/convenios-pago/recalcular', convenioPagoController.recalcular);
 router.get('/convenios-pago/:id', convenioPagoController.getOne);
 router.post('/convenios-pago', convenioPagoController.create);
 router.patch('/convenios-pago/:id', convenioPagoController.update);
 router.delete('/convenios-pago/:id', convenioPagoController.remove);
 
-// --- Cuotas de un convenio (anidadas bajo el convenio) ---
+// --- Cuotas y documentos de un convenio (anidados bajo el convenio) ---
 router.get('/convenios-pago/:id/cuotas', convenioPagoController.listCuotas);
+router.get('/convenios-pago/:id/documentos', convenioPagoController.listDocumentos);
 router.post('/convenios-pago/cuotas/:idCuota/pagos', convenioPagoController.pagarCuota);
 
 export default router;

@@ -37,12 +37,12 @@ export async function createRuta(rawInput: unknown): Promise<Ruta> {
 
 export async function updateRuta(id: number, rawInput: unknown): Promise<Ruta> {
   const input = updateRutaSchema.parse(rawInput);
-  await getRuta(id); // 404 temprano si no existe
+  // El repositorio lanza NotFoundError si rowsAffected=0; evita un SELECT
+  // adicional solo para el chequeo 404 antes de escribir.
   await rutaRepository.update(id, input);
   return getRuta(id);
 }
 
 export async function deleteRuta(id: number): Promise<void> {
-  await getRuta(id); // 404 temprano si no existe
   await rutaRepository.remove(id);
 }

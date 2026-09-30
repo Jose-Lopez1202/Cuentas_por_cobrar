@@ -1,6 +1,7 @@
 import oracledb from 'oracledb';
 import { getConnection } from '../../../../config/database';
 import type { Ruta, CreateRutaInput, UpdateRutaInput } from '@erp/contracts';
+import { NotFoundError } from '../../../../shared/errors/AppError';
 
 interface RutaRow {
   ID_RUTA: number;
@@ -21,18 +22,20 @@ function mapRow(row: RutaRow): Ruta {
     idEmpleado: row.ID_EMPLEADO,
     nombreEmpleado: row.NOMBRE_EMPLEADO,
     fecha: row.FECHA?.toISOString() ?? null,
-    estado: row.ESTADO,
+    estado: row.ESTADO?.trim(),
     observaciones: row.OBSERVACIONES,
   };
 }
 
 // OJO: la tabla de empleados en la base se llama EMPLEADO (no CXC_EMPLEADOS).
+// LEFT JOIN (no JOIN normal): un ID_EMPLEADO huérfano no debe hacer
+// desaparecer la ruta de los listados ni causar un falso 404 en findById.
 const SELECT_BASE = `
   SELECT r.ID_RUTA, r.CODIGO_RUTA, r.NOMBRE, r.ID_EMPLEADO,
          (e.NOMBRE || ' ' || e.APELLIDO) AS NOMBRE_EMPLEADO,
          r.FECHA, r.ESTADO, r.OBSERVACIONES
   FROM CXC_RUTAS r
-  JOIN EMPLEADO e ON e.ID_EMPLEADO = r.ID_EMPLEADO
+  LEFT JOIN EMPLEADO e ON e.ID_EMPLEADO = r.ID_EMPLEADO
 `;
 
 export async function findAll(params: {
@@ -56,7 +59,7 @@ export async function findAll(params: {
     );
 
     const countResult = await conn.execute<{ TOTAL: number }>(
-      `SELECT COUNT(*) AS TOTAL FROM CXC_RUTAS r JOIN EMPLEADO e ON e.ID_EMPLEADO = r.ID_EMPLEADO ${whereClause}`,
+      `SELECT COUNT(*) AS TOTAL FROM CXC_RUTAS r LEFT JOIN EMPLEADO e ON e.ID_EMPLEADO = r.ID_EMPLEADO ${whereClause}`,
       searchBind,
     );
 
@@ -119,11 +122,15 @@ export async function update(id: number, input: UpdateRutaInput): Promise<void> 
   if (input.estado !== undefined) { fields.push('ESTADO = :estado'); binds.estado = input.estado; }
   if (input.observaciones !== undefined) { fields.push('OBSERVACIONES = :observaciones'); binds.observaciones = input.observaciones; }
 
-  if (fields.length === 0) return;
+  if (fields.length === 0) {
+    if (!(await findById(id))) throw new NotFoundError(`Ruta ${id} no encontrada`);
+    return;
+  }
 
   const conn = await getConnection();
   try {
-    await conn.execute(`UPDATE CXC_RUTAS SET ${fields.join(', ')} WHERE ID_RUTA = :id`, binds);
+    const result = await conn.execute(`UPDATE CXC_RUTAS SET ${fields.join(', ')} WHERE ID_RUTA = :id`, binds);
+    if (!result.rowsAffected) throw new NotFoundError(`Ruta ${id} no encontrada`);
     await conn.commit();
   } catch (err) {
     await conn.rollback();
@@ -136,7 +143,8 @@ export async function update(id: number, input: UpdateRutaInput): Promise<void> 
 export async function remove(id: number): Promise<void> {
   const conn = await getConnection();
   try {
-    await conn.execute(`DELETE FROM CXC_RUTAS WHERE ID_RUTA = :id`, { id });
+    const result = await conn.execute(`DELETE FROM CXC_RUTAS WHERE ID_RUTA = :id`, { id });
+    if (!result.rowsAffected) throw new NotFoundError(`Ruta ${id} no encontrada`);
     await conn.commit();
   } catch (err) {
     await conn.rollback();

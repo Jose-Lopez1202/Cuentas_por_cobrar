@@ -2,6 +2,18 @@
 import type { RouteObject } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
 
+// --- CXC / Dashboard ---
+import { CxcAppLayout } from '../modules/cxc/shared/CxcAppLayout';
+import { DashboardPage } from '../modules/cxc/dashboard/DashboardPage';
+
+// --- CXC / Tutoriales ---
+import { TutorialsPage } from '../modules/cxc/tutoriales';
+
+// --- CXC / Reportes ---
+import { ReportesLayout } from '../modules/cxc/reportes/ReportesLayout';
+import { AntiguedadSaldosPage } from '../modules/cxc/reportes/AntiguedadSaldosPage';
+import { EstadoCuentaPage } from '../modules/cxc/reportes/EstadoCuentaPage';
+
 // --- CXC / Organización ---
 import { OrganizacionLayout } from '../modules/cxc/organizacion/organizacionLayout';
 import { EmpresasPage } from '../modules/cxc/organizacion/EmpresasPage';
@@ -28,6 +40,7 @@ import { PagosLayout } from '../modules/cxc/pagos/PagosLayout';
 import { PagosPage } from '../modules/cxc/pagos/PagosPage';
 import { AplicacionesPagoPage } from '../modules/cxc/pagos/AplicacionesPagoPage';
 import { AnticiposPage } from '../modules/cxc/pagos/AnticiposPage';
+import { AplicacionesAnticipoPage } from '../modules/cxc/pagos/AplicacionesAnticipoPage';
 import { RecibosPage } from '../modules/cxc/pagos/RecibosPage';
 import { FormasPagoPage } from '../modules/cxc/pagos/FormasPagoPage';
 // --- CXC / Documentos ---
@@ -39,6 +52,52 @@ import { AjustesPage } from '../modules/cxc/documentos/AjustesPage';
 
 
 export const routes: RouteObject[] = [
+  // --- CXC / Dashboard ---
+  {
+    path: '/cxc/dashboard',
+    element: (
+      <MainLayout>
+        <CxcAppLayout>
+          <DashboardPage />
+        </CxcAppLayout>
+      </MainLayout>
+    ),
+  },
+
+  // --- CXC / Tutoriales ---
+  {
+    path: '/cxc/tutoriales',
+    element: (
+      <MainLayout>
+        <CxcAppLayout>
+          <TutorialsPage />
+        </CxcAppLayout>
+      </MainLayout>
+    ),
+  },
+
+  // --- CXC / Reportes ---
+  {
+    path: '/cxc/reportes/antiguedad-saldos',
+    element: (
+      <MainLayout>
+        <ReportesLayout>
+          <AntiguedadSaldosPage />
+        </ReportesLayout>
+      </MainLayout>
+    ),
+  },
+  {
+    path: '/cxc/reportes/estado-cuenta',
+    element: (
+      <MainLayout>
+        <ReportesLayout>
+          <EstadoCuentaPage />
+        </ReportesLayout>
+      </MainLayout>
+    ),
+  },
+
   // --- CXC / Organización ---
   {
     path: '/cxc/organizacion/empresas',
@@ -150,6 +209,16 @@ export const routes: RouteObject[] = [
       <MainLayout>
         <PagosLayout>
           <AnticiposPage />
+        </PagosLayout>
+      </MainLayout>
+    ),
+  },
+  {
+    path: '/cxc/pagos/aplicaciones-anticipo',
+    element: (
+      <MainLayout>
+        <PagosLayout>
+          <AplicacionesAnticipoPage />
         </PagosLayout>
       </MainLayout>
     ),

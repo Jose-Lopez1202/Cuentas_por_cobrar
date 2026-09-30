@@ -1,6 +1,7 @@
 // Configuración de conexión y pool de la base de datos Oracle
 import oracledb from 'oracledb';
 import { config } from './index';
+import { logger } from '../shared/logger';
 
 // oracledb corre en modo Thin por defecto desde v6+: no requiere Oracle
 // Instant Client instalado en la máquina ni en el contenedor de despliegue.
@@ -29,7 +30,7 @@ export async function initOraclePool(): Promise<oracledb.Pool> {
     );
   }
 
-  console.log(`[Oracle] Inicializando pool para el usuario ${user}...`);
+  logger.info('oracle_pool_initializing', { user });
 
   pool = await oracledb.createPool({
     user,
@@ -41,7 +42,7 @@ export async function initOraclePool(): Promise<oracledb.Pool> {
     poolTimeout: 60,
   });
 
-  console.log('[Oracle] Pool de conexiones inicializado');
+  logger.info('oracle_pool_initialized');
   return pool;
 }
 
@@ -64,6 +65,6 @@ export async function closeOraclePool(): Promise<void> {
   if (pool) {
     await pool.close(10);
     pool = null;
-    console.log('[Oracle] Pool de conexiones cerrado');
+    logger.info('oracle_pool_closed');
   }
 }

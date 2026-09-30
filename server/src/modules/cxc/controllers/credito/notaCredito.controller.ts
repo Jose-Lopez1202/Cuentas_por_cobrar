@@ -26,3 +26,7 @@ export async function update(req: Request, res: Response, next: NextFunction) {
 export async function remove(req: Request, res: Response, next: NextFunction) {
   try { await service.remove(Number(req.params.id)); res.status(204).send(); } catch (error) { next(error); }
 }
+
+export async function anular(req: Request, res: Response, next: NextFunction) {
+  try { res.json(await service.anular(Number(req.params.id), req.body)); } catch (error) { next(error); }
+}

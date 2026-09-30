@@ -25,6 +25,7 @@ interface Props {
 
 export const AjusteForm = ({ ajuste, onSuccess, onCancel }: Props) => {
   const isEditing = Boolean(ajuste);
+  const isLocked = isEditing && ajuste!.estado !== 'PENDIENTE';
   const [clientes, setClientes] = useState<DocumentoCatalogoOption[]>([]);
   const [empleados, setEmpleados] = useState<DocumentoCatalogoOption[]>([]);
   const [documentos, setDocumentos] = useState<DocumentoCatalogoOption[]>([]);
@@ -101,13 +102,17 @@ export const AjusteForm = ({ ajuste, onSuccess, onCancel }: Props) => {
     return next;
   }, [idCliente, tipoAjuste, monto, fecha, idEmpleado, motivo, selectedDocumento]);
 
-  const isFormValid = !hasErrors(validationErrors);
+  const isFormValid = !hasErrors(validationErrors) && !isLocked;
   const errorFor = (field: string, value = '') =>
     errors[field] ?? (value ? validationErrors[field] : undefined);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
+    if (isLocked) {
+      setFormError('Este ajuste ya fue procesado y su cabecera queda bloqueada.');
+      return;
+    }
     if (!isFormValid) {
       setErrors(validationErrors);
       return;
@@ -147,8 +152,14 @@ export const AjusteForm = ({ ajuste, onSuccess, onCancel }: Props) => {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
       <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-        <strong>Control financiero:</strong> registrar un ajuste no modifica el saldo todavía. El efecto se aplicará únicamente al aprobarlo cuando se complete el flujo de autorización en Oracle.
+        <strong>Control financiero:</strong> un ajuste nace PENDIENTE y no modifica el saldo. El efecto se aplica únicamente cuando se aprueba desde la lista de ajustes.
       </div>
+
+      {isLocked && (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          Este ajuste ya fue {ajuste?.estado?.toLowerCase()} y su cabecera queda bloqueada para proteger la trazabilidad.
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Select
@@ -159,6 +170,7 @@ export const AjusteForm = ({ ajuste, onSuccess, onCancel }: Props) => {
           options={clientes.map((c) => ({ value: c.id, label: c.label }))}
           helperText="El documento se filtrará por el cliente seleccionado."
           error={errorFor('idCliente')}
+          isReadOnly={isLocked}
         />
         <Select
           label="Documento"
@@ -166,7 +178,7 @@ export const AjusteForm = ({ ajuste, onSuccess, onCancel }: Props) => {
           onChange={(e: any) => setIdDocumento(e.target.value)}
           options={documentos.map((d) => ({ value: d.id, label: d.label }))}
           placeholder={idCliente ? 'Seleccionar documento (opcional)' : 'Selecciona un cliente primero'}
-          isReadOnly={!idCliente}
+          isReadOnly={!idCliente || isLocked}
           helperText="Opcional; solo se muestran documentos del cliente seleccionado."
         />
       </div>
@@ -180,6 +192,7 @@ export const AjusteForm = ({ ajuste, onSuccess, onCancel }: Props) => {
           options={TIPO_OPTIONS}
           helperText="Débito aumenta la deuda; Crédito la reduce cuando el ajuste sea aprobado."
           error={errorFor('tipoAjuste', tipoAjuste)}
+          isReadOnly={isLocked}
         />
         <TextInput
           label="Monto"
@@ -197,6 +210,7 @@ export const AjusteForm = ({ ajuste, onSuccess, onCancel }: Props) => {
               : 'Monto mayor a 0 y máximo 2 decimales.'
           }
           error={errorFor('monto', monto)}
+          isReadOnly={isLocked}
         />
       </div>
 
@@ -209,6 +223,7 @@ export const AjusteForm = ({ ajuste, onSuccess, onCancel }: Props) => {
         onChange={(e: any) => setMotivo(e.target.value)}
         rows={3}
         error={errorFor('motivo', motivo)}
+        isReadOnly={isLocked}
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -221,6 +236,7 @@ export const AjusteForm = ({ ajuste, onSuccess, onCancel }: Props) => {
           onChange={(e: any) => setFecha(e.target.value)}
           helperText="Fecha del ajuste; no puede ser futura."
           error={errorFor('fecha', fecha)}
+          isReadOnly={isLocked}
         />
         <Select
           label="Empleado solicitante"
@@ -230,6 +246,7 @@ export const AjusteForm = ({ ajuste, onSuccess, onCancel }: Props) => {
           options={empleados.map((e) => ({ value: e.id, label: e.label }))}
           helperText="Empleado responsable de solicitar/registrar el ajuste."
           error={errorFor('idEmpleado')}
+          isReadOnly={isLocked}
         />
       </div>
 

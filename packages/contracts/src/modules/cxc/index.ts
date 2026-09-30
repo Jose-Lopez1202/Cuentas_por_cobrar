@@ -6,3 +6,5 @@ export * from './cobranza';
 export * from './pagos';
 export * from './credito';
 export * from './documentos';
+export * from './dashboard';
+export * from './reportes';

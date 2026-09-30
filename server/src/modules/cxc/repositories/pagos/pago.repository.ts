@@ -1,6 +1,7 @@
 import oracledb from 'oracledb';
 import { getConnection } from '../../../../config/database';
-import type { Pago, CreatePagoInput, UpdatePagoInput } from '@erp/contracts';
+import type { Pago, CreatePagoInput, UpdatePagoInput, AnularPagoInput } from '@erp/contracts';
+import { BadRequestError, ConflictError, NotFoundError } from '../../../../shared/errors/AppError';
 
 interface Row {
   ID_PAGO: number;
@@ -9,12 +10,17 @@ interface Row {
   ID_FORMA_PAGO: number;
   ID_MONEDA: number;
   ID_BANCO: number | null;
+  NOMBRE_BANCO: string | null;
   FECHA_PAGO: Date;
   MONTO: number;
   MONTO_APLICADO: number;
   MONTO_DISPONIBLE: number;
   NUMERO_REFERENCIA: string | null;
   ESTADO: string;
+  ID_EMPLEADO_ANULACION: number | null;
+  NOMBRE_EMPLEADO_ANULACION: string | null;
+  FECHA_ANULACION: Date | null;
+  MOTIVO_ANULACION: string | null;
 }
 
 const mapRow = (r: Row): Pago => ({
@@ -24,12 +30,17 @@ const mapRow = (r: Row): Pago => ({
   idFormaPago: r.ID_FORMA_PAGO,
   idMoneda: r.ID_MONEDA,
   idBanco: r.ID_BANCO,
+  nombreBanco: r.NOMBRE_BANCO,
   fechaPago: r.FECHA_PAGO?.toISOString() ?? '',
   monto: r.MONTO,
   montoAplicado: Number(r.MONTO_APLICADO ?? 0),
   montoDisponible: Number(r.MONTO_DISPONIBLE ?? r.MONTO),
   numeroReferencia: r.NUMERO_REFERENCIA,
   estado: r.ESTADO,
+  idEmpleadoAnulacion: r.ID_EMPLEADO_ANULACION,
+  nombreEmpleadoAnulacion: r.NOMBRE_EMPLEADO_ANULACION,
+  fechaAnulacion: r.FECHA_ANULACION?.toISOString() ?? null,
+  motivoAnulacion: r.MOTIVO_ANULACION,
 });
 
 const SELECT_BASE = `
@@ -39,21 +50,31 @@ const SELECT_BASE = `
          p.ID_FORMA_PAGO,
          p.ID_MONEDA,
          p.ID_BANCO,
+         b.NOMBRE AS NOMBRE_BANCO,
          p.FECHA_PAGO,
          p.MONTO,
          NVL((SELECT SUM(a.MONTO_APLICADO)
                 FROM CXC_APLICACION_PAGOS a
-               WHERE a.ID_PAGO = p.ID_PAGO), 0) AS MONTO_APLICADO,
+               WHERE a.ID_PAGO = p.ID_PAGO AND a.ESTADO = 'CONFIRMADA'), 0) AS MONTO_APLICADO,
          GREATEST(
            p.MONTO - NVL((SELECT SUM(a.MONTO_APLICADO)
                             FROM CXC_APLICACION_PAGOS a
-                           WHERE a.ID_PAGO = p.ID_PAGO), 0),
+                           WHERE a.ID_PAGO = p.ID_PAGO AND a.ESTADO = 'CONFIRMADA'), 0),
            0
          ) AS MONTO_DISPONIBLE,
          p.NUMERO_REFERENCIA,
-         p.ESTADO
+         p.ESTADO,
+         p.ID_EMPLEADO_ANULACION,
+         CASE
+           WHEN ea.ID_EMPLEADO IS NULL THEN NULL
+           ELSE TRIM(ea.NOMBRE || ' ' || NVL(ea.APELLIDO, ''))
+         END AS NOMBRE_EMPLEADO_ANULACION,
+         p.FECHA_ANULACION,
+         p.MOTIVO_ANULACION
     FROM CXC_PAGOS p
     LEFT JOIN CLIENTE c ON c.ID_CLIENTE = p.ID_CLIENTE
+    LEFT JOIN MB_BANCO b ON b.BANCO_ID = p.ID_BANCO
+    LEFT JOIN EMPLEADO ea ON ea.ID_EMPLEADO = p.ID_EMPLEADO_ANULACION
 `;
 
 export async function findAll({ page, limit, search }: { page: number; limit: number; search?: string }) {
@@ -128,6 +149,29 @@ export async function create(i: CreatePagoInput) {
   }
 }
 
+/**
+ * Bloquea el pago (FOR UPDATE) y revalida bajo esa misma conexión que sigue
+ * sin aplicaciones CONFIRMADA antes de escribir. Una lectura suelta aquí
+ * (como antes) quedaría obsoleta frente a una aplicación concurrente.
+ */
+async function lockYValidarSinAplicaciones(c: oracledb.Connection, id: number, mensajeSiAplicado: string): Promise<{ ESTADO: string }> {
+  const lockResult = await c.execute<{ ESTADO: string }>(
+    `SELECT ESTADO FROM CXC_PAGOS WHERE ID_PAGO = :id FOR UPDATE`,
+    { id },
+  );
+  const row = lockResult.rows?.[0];
+  if (!row) throw new NotFoundError(`Pago ${id} no encontrado`);
+
+  const sumResult = await c.execute<{ TOTAL: number }>(
+    `SELECT NVL(SUM(MONTO_APLICADO), 0) AS TOTAL FROM CXC_APLICACION_PAGOS WHERE ID_PAGO = :id AND ESTADO = 'CONFIRMADA'`,
+    { id },
+  );
+  if (Number(sumResult.rows?.[0]?.TOTAL ?? 0) > 0.005) {
+    throw new ConflictError(mensajeSiAplicado);
+  }
+  return row;
+}
+
 export async function update(id: number, i: UpdatePagoInput) {
   const f: string[] = [];
   const b: Record<string, any> = { id };
@@ -143,6 +187,11 @@ export async function update(id: number, i: UpdatePagoInput) {
 
   const c = await getConnection();
   try {
+    await lockYValidarSinAplicaciones(
+      c,
+      id,
+      'El pago ya tiene aplicaciones y no puede editarse directamente. Primero debe reversarse la aplicación.',
+    );
     await c.execute(`UPDATE CXC_PAGOS SET ${f.join(',')} WHERE ID_PAGO=:id`, b);
     await c.commit();
   } catch (e) {
@@ -156,6 +205,15 @@ export async function update(id: number, i: UpdatePagoInput) {
 export async function remove(id: number) {
   const c = await getConnection();
   try {
+    const row = await lockYValidarSinAplicaciones(
+      c,
+      id,
+      'Un pago con aplicaciones no se elimina. Debe reversarse para conservar trazabilidad.',
+    );
+    const estado = String(row.ESTADO ?? '').trim().toUpperCase();
+    if (!['NO_IDENTIFICADO', 'NO_APLICADO'].includes(estado)) {
+      throw new ConflictError('Solo pagos sin aplicar pueden eliminarse físicamente. Los demás deben anularse/reversarse.');
+    }
     await c.execute(`DELETE FROM CXC_PAGOS WHERE ID_PAGO=:id`, { id });
     await c.commit();
   } catch (e) {
@@ -185,7 +243,7 @@ export async function listOptions(idCliente?: number) {
               GREATEST(p.MONTO - NVL(SUM(a.MONTO_APLICADO),0),0) DISPONIBLE,
               p.ESTADO
          FROM CXC_PAGOS p
-         LEFT JOIN CXC_APLICACION_PAGOS a ON a.ID_PAGO = p.ID_PAGO
+         LEFT JOIN CXC_APLICACION_PAGOS a ON a.ID_PAGO = p.ID_PAGO AND a.ESTADO = 'CONFIRMADA'
          ${where}
         GROUP BY p.ID_PAGO,p.ID_CLIENTE,p.NUMERO_REFERENCIA,p.MONTO,p.ESTADO
        HAVING GREATEST(p.MONTO - NVL(SUM(a.MONTO_APLICADO),0),0) > 0
@@ -201,6 +259,58 @@ export async function listOptions(idCliente?: number) {
       saldo: x.DISPONIBLE,
       estado: x.ESTADO,
     }));
+  } finally {
+    await c.close();
+  }
+}
+
+/**
+ * Anulación formal: solo permitida sin aplicaciones CONFIRMADA vigentes
+ * (reversar primero cada aplicación si las tiene). No borra la fila; deja
+ * ESTADO='ANULADO' con trazabilidad. Bloquea la fila para serializar contra
+ * una aplicación concurrente.
+ */
+export async function anular(id: number, input: AnularPagoInput): Promise<void> {
+  const c = await getConnection();
+  try {
+    const result = await c.execute<{ ESTADO: string }>(
+      `SELECT ESTADO FROM CXC_PAGOS WHERE ID_PAGO = :id FOR UPDATE`,
+      { id },
+    );
+    const row = result.rows?.[0];
+    if (!row) throw new NotFoundError(`Pago ${id} no encontrado`);
+
+    const estadoActual = String(row.ESTADO ?? '').trim().toUpperCase();
+    if (estadoActual === 'ANULADO') throw new ConflictError('Este pago ya está anulado.');
+
+    const aplicadoResult = await c.execute<{ TOTAL: number }>(
+      `SELECT NVL(SUM(MONTO_APLICADO), 0) TOTAL
+         FROM CXC_APLICACION_PAGOS
+        WHERE ID_PAGO = :id AND ESTADO = 'CONFIRMADA'`,
+      { id },
+    );
+    if (Number(aplicadoResult.rows?.[0]?.TOTAL ?? 0) > 0.005) {
+      throw new ConflictError('Este pago tiene aplicaciones vigentes. Reversa cada aplicación antes de anularlo.');
+    }
+
+    await c.execute(
+      `UPDATE CXC_PAGOS
+          SET ESTADO = 'ANULADO',
+              ID_EMPLEADO_ANULACION = :idEmpleadoAnulacion,
+              FECHA_ANULACION = NVL(TO_DATE(:fechaAnulacion, 'YYYY-MM-DD'), SYSDATE),
+              MOTIVO_ANULACION = :motivoAnulacion
+        WHERE ID_PAGO = :id`,
+      {
+        idEmpleadoAnulacion: input.idEmpleadoAnulacion,
+        fechaAnulacion: input.fechaAnulacion ?? null,
+        motivoAnulacion: input.motivoAnulacion,
+        id,
+      },
+    );
+    await c.commit();
+  } catch (e) {
+    await c.rollback();
+    throw e;
   } finally {
     await c.close();
   }

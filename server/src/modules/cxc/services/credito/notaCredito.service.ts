@@ -2,12 +2,14 @@ import { businessTodayIso } from '../../../../shared/date';
 import {
   createNotaCreditoSchema,
   updateNotaCreditoSchema,
+  anularNotaCreditoSchema,
   type NotaCredito,
 } from '@erp/contracts';
 import * as repository from '../../repositories/credito/notaCredito.repository';
-import * as aplicacionRepository from '../../repositories/credito/aplicacionNotaCredito.repository';
 import * as documentoRepository from '../../repositories/documentos/documento.repository';
+import * as catalogosRepository from '../../repositories/catalogos.repository';
 import { BadRequestError, ConflictError, NotFoundError } from '../../../../shared/errors/AppError';
+import { isDocumentoBloqueadoParaAplicacion } from '../../shared/financialRules';
 
 async function assertDocumentoReferencia(idCliente: number, idDocumento: number | null | undefined, monto: number) {
   if (!idDocumento) return;
@@ -16,7 +18,7 @@ async function assertDocumentoReferencia(idCliente: number, idDocumento: number 
   if (documento.idCliente !== idCliente) throw new BadRequestError('El documento de referencia debe pertenecer al cliente seleccionado');
   if (documento.saldo <= 0) throw new BadRequestError('El documento de referencia ya no tiene saldo pendiente');
   if (monto > documento.saldo) throw new BadRequestError('El monto de la nota no puede superar el saldo del documento de referencia');
-  if (['PAGADO', 'PAGADA', 'ANULADO', 'ANULADA'].includes(String(documento.estado).toUpperCase())) {
+  if (isDocumentoBloqueadoParaAplicacion(documento.estado)) {
     throw new ConflictError('No se puede registrar una nota contra un documento pagado o anulado.');
   }
 }
@@ -46,13 +48,6 @@ export async function create(rawInput: unknown) {
 
 export async function update(id: number, rawInput: unknown) {
   const current = await getOne(id);
-  const aplicado = await aplicacionRepository.sumAplicadoPorNota(id);
-  if (aplicado > 0.005) {
-    throw new ConflictError(
-      'La nota de crédito ya tiene aplicaciones y no puede editarse directamente. Primero debe reversarse la aplicación.',
-    );
-  }
-
   const input = updateNotaCreditoSchema.parse(rawInput);
   const finalFecha = input.fecha ?? current.fecha.slice(0, 10);
   if (finalFecha > businessTodayIso()) throw new BadRequestError('La fecha de la nota de crédito no puede ser futura');
@@ -64,18 +59,31 @@ export async function update(id: number, rawInput: unknown) {
       input.monto ?? current.monto,
     );
   }
+
+  // repository.update() bloquea la fila (FOR UPDATE) y revalida bajo esa
+  // misma conexión que la nota sigue sin aplicaciones: una lectura suelta
+  // aquí (como antes) quedaría obsoleta frente a una aplicación concurrente.
   await repository.update(id, input);
   return getOne(id);
 }
 
 export async function remove(id: number) {
-  const current = await getOne(id);
-  const aplicado = await aplicacionRepository.sumAplicadoPorNota(id);
-  if (aplicado > 0.005) {
-    throw new ConflictError('Una nota de crédito aplicada no se elimina. Debe reversarse/anularse para conservar trazabilidad.');
-  }
-  if (!['PENDIENTE', 'ACTIVA'].includes(String(current.estado).toUpperCase())) {
-    throw new ConflictError('Solo una nota pendiente y sin aplicaciones puede eliminarse físicamente.');
-  }
+  await getOne(id);
+  // repository.remove() bloquea la fila, revalida aplicaciones y estado bajo
+  // FOR UPDATE antes de borrar.
   await repository.remove(id);
+}
+
+export async function anular(id: number, rawInput: unknown): Promise<NotaCredito> {
+  if (!Number.isInteger(id) || id <= 0) throw new BadRequestError('ID de nota de crédito inválido');
+  const input = anularNotaCreditoSchema.parse(rawInput);
+  if (input.fechaAnulacion && input.fechaAnulacion > businessTodayIso()) {
+    throw new BadRequestError('La fecha de anulación no puede ser futura');
+  }
+  if (!(await catalogosRepository.empleadoExiste(input.idEmpleadoAnulacion))) {
+    throw new BadRequestError('El empleado seleccionado no existe');
+  }
+
+  await repository.anular(id, input);
+  return getOne(id);
 }

@@ -35,12 +35,10 @@ export async function createDetalle(idRuta: number, rawInput: unknown): Promise<
 
 export async function updateDetalle(id: number, rawInput: unknown): Promise<RutaDetalle> {
   const input = updateRutaDetalleSchema.parse(rawInput);
-  await getDetalle(id); // 404 temprano si no existe
   await rutaDetalleRepository.update(id, input);
   return getDetalle(id);
 }
 
 export async function deleteDetalle(id: number): Promise<void> {
-  await getDetalle(id); // 404 temprano si no existe
   await rutaDetalleRepository.remove(id);
 }

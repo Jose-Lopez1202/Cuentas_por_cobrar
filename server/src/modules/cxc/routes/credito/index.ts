@@ -18,6 +18,7 @@ router.get('/notas-credito/:id', notaCreditoController.getOne);
 router.post('/notas-credito', notaCreditoController.create);
 router.patch('/notas-credito/:id', notaCreditoController.update);
 router.delete('/notas-credito/:id', notaCreditoController.remove);
+router.post('/notas-credito/:id/anular', notaCreditoController.anular);
 
 router.get(
   '/aplicaciones-nota-credito',
@@ -44,8 +45,14 @@ router.delete(
   aplicacionNotaCreditoController.remove,
 );
 
+router.post(
+  '/aplicaciones-nota-credito/:id/reversar',
+  aplicacionNotaCreditoController.reversar,
+);
 
 
+
+router.post('/mora/recalcular', moraController.recalcular);
 router.get('/mora', moraController.list);
 router.get('/mora/:id', moraController.getOne);
 router.post('/mora', moraController.create);

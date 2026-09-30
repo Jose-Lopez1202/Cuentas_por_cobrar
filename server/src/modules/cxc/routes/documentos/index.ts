@@ -12,6 +12,7 @@ const router = Router();
 router.get('/documentos/catalogos/clientes', catalogosController.clientes);
 router.get('/documentos/catalogos/tipos-documento', catalogosController.tiposDocumento);
 router.get('/documentos/catalogos/monedas', catalogosController.monedas);
+router.get('/documentos/catalogos/condiciones-credito', catalogosController.condicionesCredito);
 router.get('/documentos/catalogos/empleados', catalogosController.empleados);
 router.get('/documentos/catalogos/clientes/:idCliente/documentos', catalogosController.documentosPorCliente);
 
@@ -21,6 +22,7 @@ router.get('/documentos/:id', documentoController.getOne);
 router.post('/documentos', documentoController.create);
 router.patch('/documentos/:id', documentoController.update);
 router.delete('/documentos/:id', documentoController.remove);
+router.post('/documentos/:id/anular', documentoController.anular);
 
 // --- CXC_DOCUMENTO_DETALLE (anidado al documento) ---
 router.get('/documentos/:id/detalles', detalleController.listByDocumento);
@@ -47,5 +49,7 @@ router.get('/ajustes/:id', ajusteController.getOne);
 router.post('/ajustes', ajusteController.create);
 router.patch('/ajustes/:id', ajusteController.update);
 router.delete('/ajustes/:id', ajusteController.remove);
+router.post('/ajustes/:id/aprobar', ajusteController.aprobar);
+router.post('/ajustes/:id/rechazar', ajusteController.rechazar);
 
 export default router;
