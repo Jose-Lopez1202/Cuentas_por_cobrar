@@ -4,6 +4,7 @@
   "private": true,
   "description": "Monorepo oficial para el ERP Universitario",
   "scripts": {
+    "predev": "pnpm --filter @erp/contracts build",
     "dev": "pnpm --filter \"@erp/*\" --parallel dev",
     "build": "pnpm --filter \"@erp/*\" build"
   },

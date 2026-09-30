@@ -1,2 +1,2 @@
-// Exportación de hooks personalizados reutilizables
-export {};
+// Hooks personalizados reutilizables
+export { usePaginatedList } from './usePaginatedList';

@@ -4,3 +4,4 @@ packages:
   - 'packages/contracts'
 allowBuilds:
   esbuild: true
+  oracledb: true
