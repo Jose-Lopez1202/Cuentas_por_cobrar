@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Save, X } from 'lucide-react';
 import { Button } from '../ui-kit';
+import { ConfirmDialog } from './ConfirmDialog';
 
 interface FormActionButtonsProps {
   onCancel: () => void;
@@ -11,6 +13,12 @@ interface FormActionButtonsProps {
   savingLabel?: string;
   /** Validez de negocio calculada por el formulario. */
   isFormValid?: boolean;
+  /** Textos de la confirmación previa a guardar (tienen valores por defecto). */
+  confirmTitle?: string;
+  confirmMessage?: string;
+  confirmLabel?: string;
+  /** true = guarda directo, sin pedir confirmación. */
+  skipConfirm?: boolean;
 }
 
 export function FormActionButtons({
@@ -21,9 +29,17 @@ export function FormActionButtons({
   editLabel = 'Guardar cambios',
   savingLabel = 'Guardando...',
   isFormValid,
+  confirmTitle,
+  confirmMessage,
+  confirmLabel,
+  skipConfirm = false,
 }: FormActionButtonsProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [htmlValid, setHtmlValid] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const confirmedRef = useRef(false);
+  const submittingRef = useRef(isSubmitting);
+  submittingRef.current = isSubmitting;
 
   useEffect(() => {
     const form = containerRef.current?.closest('form');
@@ -50,6 +66,47 @@ export function FormActionButtons({
       observer.disconnect();
     };
   }, []);
+
+  // Intercepta el submit (botón o Enter): primero pregunta, luego deja pasar.
+  useEffect(() => {
+    const form = containerRef.current?.closest('form');
+    if (!form || skipConfirm) return;
+
+    const onSubmit = (event: Event) => {
+      if (confirmedRef.current) {
+        confirmedRef.current = false;
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      if (!submittingRef.current) setConfirmOpen(true);
+    };
+
+    form.addEventListener('submit', onSubmit, true);
+    return () => form.removeEventListener('submit', onSubmit, true);
+  }, [skipConfirm]);
+
+  // Escape cierra solo la confirmación, no el modal del formulario que está debajo.
+  useEffect(() => {
+    if (!confirmOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      setConfirmOpen(false);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [confirmOpen]);
+
+  const handleConfirm = () => {
+    setConfirmOpen(false);
+    const form = containerRef.current?.closest('form');
+    if (!form) return;
+    confirmedRef.current = true;
+    form.requestSubmit();
+    confirmedRef.current = false;
+  };
 
   const isComplete = htmlValid && isFormValid !== false;
   const submitLabel = isSubmitting
@@ -84,6 +141,25 @@ export function FormActionButtons({
       >
         {submitLabel}
       </Button>
+
+      {/* Portal: fuera del <form>, así sus botones nunca disparan un submit. */}
+      {createPortal(
+        <ConfirmDialog
+          isOpen={confirmOpen}
+          onClose={() => setConfirmOpen(false)}
+          onConfirm={handleConfirm}
+          title={confirmTitle ?? (isEditing ? 'Confirmar cambios' : 'Confirmar registro')}
+          description={
+            confirmMessage ??
+            (isEditing
+              ? '¿Estás seguro de que deseas guardar los cambios realizados?'
+              : '¿Estás seguro de que deseas guardar esta información?')
+          }
+          confirmLabel={confirmLabel ?? (isEditing ? 'Sí, guardar cambios' : 'Sí, guardar')}
+          variant="primary"
+        />,
+        document.body,
+      )}
     </div>
   );
 }

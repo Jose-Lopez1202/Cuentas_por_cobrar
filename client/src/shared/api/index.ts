@@ -1,6 +1,8 @@
 // Cliente API único para todo el frontend. Centraliza URL, timeout, errores,
 // cabeceras y política de caché para evitar fetch() inconsistentes por módulo.
 
+import { toast } from '../components/Toast';
+
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
 const REQUEST_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS ?? 15000);
 
@@ -15,7 +17,26 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+/**
+ * successMessage: texto del aviso al terminar bien un POST/PATCH/DELETE.
+ * Usa `false` para no mostrar aviso en una llamada concreta.
+ */
+export type ApiOptions = RequestInit & { successMessage?: string | false };
+
+function defaultSuccessMessage(method: string, path: string): string {
+  if (path.endsWith('/recalcular')) return 'Recálculo completado correctamente.';
+  if (method === 'DELETE') return 'Registro eliminado correctamente.';
+  if (method === 'PATCH' || method === 'PUT') return 'Cambios guardados correctamente.';
+  return 'Información guardada correctamente.';
+}
+
+async function request<T>(path: string, { successMessage, ...options }: ApiOptions = {}): Promise<T> {
+  const notifySuccess = () => {
+    const method = (options.method ?? 'GET').toUpperCase();
+    if (method === 'GET' || successMessage === false) return;
+    toast.success(successMessage ?? defaultSuccessMessage(method, path));
+  };
+
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
@@ -37,6 +58,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     });
 
     if (response.status === 204) {
+      notifySuccess();
       return undefined as T;
     }
 
@@ -50,6 +72,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       );
     }
 
+    notifySuccess();
     return body as T;
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
@@ -63,12 +86,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export const apiClient = {
-  get: <T>(path: string, options: RequestInit = {}) => request<T>(path, { ...options, method: 'GET' }),
-  post: <T>(path: string, data: unknown, options: RequestInit = {}) =>
+  get: <T>(path: string, options: ApiOptions = {}) => request<T>(path, { ...options, method: 'GET' }),
+  post: <T>(path: string, data: unknown, options: ApiOptions = {}) =>
     request<T>(path, { ...options, method: 'POST', body: JSON.stringify(data) }),
-  patch: <T>(path: string, data: unknown, options: RequestInit = {}) =>
+  patch: <T>(path: string, data: unknown, options: ApiOptions = {}) =>
     request<T>(path, { ...options, method: 'PATCH', body: JSON.stringify(data) }),
-  delete: <T>(path: string, options: RequestInit = {}) => request<T>(path, { ...options, method: 'DELETE' }),
+  delete: <T>(path: string, options: ApiOptions = {}) => request<T>(path, { ...options, method: 'DELETE' }),
 };
 
 /** Construye un query string ignorando valores undefined/vacíos. */

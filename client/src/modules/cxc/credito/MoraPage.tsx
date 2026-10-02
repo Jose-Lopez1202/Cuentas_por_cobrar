@@ -30,6 +30,7 @@ export const MoraPage = () => {
 
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRecalculando, setIsRecalculando] = useState(false);
+  const [confirmRecalcularOpen, setConfirmRecalcularOpen] = useState(false);
   const [recalculoMensaje, setRecalculoMensaje] = useState<string | null>(null);
 
   const { data, meta, isLoading, error, refetch } =
@@ -43,6 +44,7 @@ export const MoraPage = () => {
     );
 
   const handleRecalcular = async () => {
+    setConfirmRecalcularOpen(false);
     setIsRecalculando(true);
     setRecalculoMensaje(null);
     try {
@@ -96,7 +98,7 @@ export const MoraPage = () => {
           <Button
             variant="secondary"
             icon={RefreshCw}
-            onClick={handleRecalcular}
+            onClick={() => setConfirmRecalcularOpen(true)}
             disabled={isRecalculando}
           >
             {isRecalculando ? 'Recalculando...' : 'Recalcular Mora'}
@@ -269,6 +271,16 @@ export const MoraPage = () => {
           }}
         />
       </Modal>
+
+      <ConfirmDialog
+        isOpen={confirmRecalcularOpen}
+        onClose={() => setConfirmRecalcularOpen(false)}
+        onConfirm={handleRecalcular}
+        title="Confirmar recálculo de mora"
+        description="¿Estás seguro de recalcular la mora? Se actualizarán los registros activos y se cerrarán los que ya no apliquen."
+        confirmLabel="Sí, recalcular"
+        variant="primary"
+      />
 
       <ConfirmDialog
         isOpen={!!moraAEliminar}
