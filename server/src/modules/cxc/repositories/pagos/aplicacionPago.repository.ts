@@ -12,6 +12,7 @@ import { registrarEvento } from '../documentos/documentoHistorial.repository';
 import { crearReciboAutomatico } from './recibo.repository';
 
 interface Row {
+  ID_RUTA_DETALLE: number | null;
   ID_APLICACION: number;
   ID_PAGO: number;
   REFERENCIA_PAGO: string | null;
@@ -30,6 +31,7 @@ interface Row {
 }
 
 interface PagoLockRow {
+  ID_MONEDA: number;
   ID_PAGO: number;
   ID_CLIENTE: number;
   MONTO: number;
@@ -37,6 +39,7 @@ interface PagoLockRow {
 }
 
 interface DocumentoLockRow {
+  ID_MONEDA: number;
   ID_DOCUMENTO: number;
   ID_CLIENTE: number;
   TOTAL: number;
@@ -54,6 +57,7 @@ interface AplicacionLockRow {
 
 const mapRow = (r: Row): AplicacionPago => ({
   idAplicacion: r.ID_APLICACION,
+  idRutaDetalle: r.ID_RUTA_DETALLE,
   idPago: r.ID_PAGO,
   referenciaPago: r.REFERENCIA_PAGO,
   idDocumento: r.ID_DOCUMENTO,
@@ -72,7 +76,7 @@ const mapRow = (r: Row): AplicacionPago => ({
 });
 
 const SELECT_BASE = `
-  SELECT a.ID_APLICACION,
+  SELECT a.ID_APLICACION, a.ID_RUTA_DETALLE,
          a.ID_PAGO,
          p.NUMERO_REFERENCIA AS REFERENCIA_PAGO,
          a.ID_DOCUMENTO,
@@ -170,8 +174,40 @@ export async function findById(id: number) {
 export async function create(i: CreateAplicacionPagoInput): Promise<number> {
   const c = await getConnection();
   try {
+    if (i.idRutaDetalle) {
+      // Route first, then assignment, payment and document. Other route writes use
+      // the same order; normal payment writes never acquire a route afterwards.
+      const detalle = await c.execute<{ID_RUTA:number}>(
+        'SELECT ID_RUTA FROM CXC_RUTA_DETALLE WHERE ID_RUTA_DETALLE=:id', {id:i.idRutaDetalle});
+      if (!detalle.rows?.length) throw new NotFoundError('Asignación no encontrada');
+      const ruta = await c.execute<{ESTADO:string}>(
+        'SELECT ESTADO FROM CXC_RUTAS WHERE ID_RUTA=:id FOR UPDATE', {id:detalle.rows[0].ID_RUTA});
+      const asignacion = await c.execute<{ID_DOCUMENTO:number;MONTO_ASIGNADO:number}>(
+        'SELECT ID_DOCUMENTO,MONTO_ASIGNADO FROM CXC_RUTA_DETALLE WHERE ID_RUTA_DETALLE=:id FOR UPDATE', {id:i.idRutaDetalle});
+      if (!asignacion.rows?.length || asignacion.rows[0].ID_DOCUMENTO !== i.idDocumento) {
+        throw new BadRequestError('El documento no coincide con la asignación');
+      }
+      const anterior = await c.execute<{ID_APLICACION:number;ID_PAGO:number;ID_DOCUMENTO:number;ID_RUTA_DETALLE:number;MONTO_APLICADO:number;ID_EMPLEADO:number;FECHA:string}>(
+        `SELECT ID_APLICACION,ID_PAGO,ID_DOCUMENTO,ID_RUTA_DETALLE,MONTO_APLICADO,ID_EMPLEADO,
+        TO_CHAR(FECHA_APLICACION,'YYYY-MM-DD') FECHA FROM CXC_APLICACION_PAGOS WHERE CLAVE_RUTA=:clave`, {clave:i.claveRuta});
+      if (anterior.rows?.length) {
+        const a=anterior.rows[0];
+        if(a.ID_PAGO!==i.idPago || a.ID_DOCUMENTO!==i.idDocumento || a.ID_RUTA_DETALLE!==i.idRutaDetalle ||
+          a.ID_EMPLEADO!==i.idEmpleado || a.FECHA!==i.fechaAplicacion || roundMoney(a.MONTO_APLICADO)!==roundMoney(i.montoAplicado)) {
+          throw new ConflictError('La clave de operación ya fue utilizada para otro cobro');
+        }
+        await c.commit();
+        return a.ID_APLICACION; // Retry after timeout: no second application/receipt.
+      }
+      if(!ruta.rows?.length || !['PLANIFICADA','EN_PROCESO'].includes(ruta.rows[0].ESTADO.trim())) throw new ConflictError('La ruta está cerrada');
+      const aplicado=await c.execute<{TOTAL:number}>(`SELECT NVL(SUM(MONTO_APLICADO),0) TOTAL FROM CXC_APLICACION_PAGOS
+        WHERE ID_RUTA_DETALLE=:id AND ESTADO='CONFIRMADA'`,{id:i.idRutaDetalle});
+      if(roundMoney((aplicado.rows?.[0]?.TOTAL ?? 0)+i.montoAplicado)>roundMoney(asignacion.rows[0].MONTO_ASIGNADO)) {
+        throw new ConflictError('El cobro supera el monto asignado restante');
+      }
+    }
     const pagoResult = await c.execute<PagoLockRow>(
-      `SELECT ID_PAGO, ID_CLIENTE, MONTO, ESTADO
+      `SELECT ID_PAGO, ID_CLIENTE, ID_MONEDA, MONTO, ESTADO
          FROM CXC_PAGOS
         WHERE ID_PAGO = :idPago
         FOR UPDATE`,
@@ -181,7 +217,7 @@ export async function create(i: CreateAplicacionPagoInput): Promise<number> {
     if (!pago) throw new BadRequestError('El pago seleccionado no existe');
 
     const documentoResult = await c.execute<DocumentoLockRow>(
-      `SELECT ID_DOCUMENTO, ID_CLIENTE, TOTAL, SALDO, ESTADO
+      `SELECT ID_DOCUMENTO, ID_CLIENTE, ID_MONEDA, TOTAL, SALDO, ESTADO
          FROM CXC_DOCUMENTOS
         WHERE ID_DOCUMENTO = :idDocumento
         FOR UPDATE`,
@@ -202,6 +238,10 @@ export async function create(i: CreateAplicacionPagoInput): Promise<number> {
     if (pago.ID_CLIENTE !== documento.ID_CLIENTE) {
       throw new BadRequestError('El pago y el documento deben pertenecer al mismo cliente');
     }
+
+    if (pago.ID_MONEDA !== documento.ID_MONEDA) throw new BadRequestError('El pago y el documento deben tener la misma moneda');
+    const anticipos = await c.execute(`SELECT ID_ANTICIPO FROM CXC_ANTICIPOS WHERE ID_PAGO=:id AND ESTADO <> 'CANCELADO'`, {id:i.idPago});
+    if(anticipos.rows?.length) throw new ConflictError('Este pago está reservado como anticipo; utiliza el módulo Anticipos');
 
     const sumResult = await c.execute<{ TOTAL: number }>(
       `SELECT NVL(SUM(MONTO_APLICADO), 0) TOTAL
@@ -227,9 +267,9 @@ export async function create(i: CreateAplicacionPagoInput): Promise<number> {
 
     const insert = await c.execute<{ id: number[] }>(
       `INSERT INTO CXC_APLICACION_PAGOS
-         (ID_PAGO,ID_DOCUMENTO,FECHA_APLICACION,MONTO_APLICADO,ID_EMPLEADO)
+         (ID_PAGO,ID_DOCUMENTO,FECHA_APLICACION,MONTO_APLICADO,ID_EMPLEADO,ID_RUTA_DETALLE,CLAVE_RUTA)
        VALUES
-         (:idPago,:idDocumento,TO_DATE(:fechaAplicacion,'YYYY-MM-DD'),:montoAplicado,:idEmpleado)
+         (:idPago,:idDocumento,TO_DATE(:fechaAplicacion,'YYYY-MM-DD'),:montoAplicado,:idEmpleado,:idRutaDetalle,:claveRuta)
        RETURNING ID_APLICACION INTO :id`,
       {
         idPago: i.idPago,
@@ -237,6 +277,8 @@ export async function create(i: CreateAplicacionPagoInput): Promise<number> {
         fechaAplicacion: i.fechaAplicacion,
         montoAplicado,
         idEmpleado: i.idEmpleado,
+        idRutaDetalle: i.idRutaDetalle ?? null,
+        claveRuta: i.claveRuta ?? null,
         id: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER },
       },
     );
@@ -371,7 +413,7 @@ export async function sumAplicadoPorPago(idPago: number, excludeId?: number): Pr
 
 /**
  * Reversa una aplicación CONFIRMADA: bloquea aplicación + documento + pago
- * (mismo orden de locks que create(), para evitar deadlocks con aplicaciones
+ * (pago antes de documento, igual que create(), para evitar deadlocks con aplicaciones
  * concurrentes sobre el mismo par pago/documento), revierte el efecto en el
  * documento (le devuelve el saldo) y recalcula el estado del pago a partir
  * de lo que sigue CONFIRMADA. Una sola transacción, con trazabilidad
@@ -393,8 +435,18 @@ export async function reversar(id: number, input: ReversarAplicacionPagoInput): 
       throw new ConflictError('Esta aplicación ya fue reversada.');
     }
 
+    const pagoResult = await c.execute<PagoLockRow>(
+      `SELECT ID_PAGO, ID_CLIENTE, ID_MONEDA, MONTO, ESTADO
+         FROM CXC_PAGOS
+        WHERE ID_PAGO = :idPago
+        FOR UPDATE`,
+      { idPago: aplicacion.ID_PAGO },
+    );
+    const pago = pagoResult.rows?.[0];
+    if (!pago) throw new BadRequestError('El pago de la aplicación ya no existe');
+
     const documentoResult = await c.execute<DocumentoLockRow>(
-      `SELECT ID_DOCUMENTO, ID_CLIENTE, TOTAL, SALDO, ESTADO
+      `SELECT ID_DOCUMENTO, ID_CLIENTE, ID_MONEDA, TOTAL, SALDO, ESTADO
          FROM CXC_DOCUMENTOS
         WHERE ID_DOCUMENTO = :idDocumento
         FOR UPDATE`,
@@ -407,16 +459,6 @@ export async function reversar(id: number, input: ReversarAplicacionPagoInput): 
     if (docEstado === 'ANULADO' || docEstado === 'ANULADA') {
       throw new ConflictError('No se puede reversar una aplicación sobre un documento anulado.');
     }
-
-    const pagoResult = await c.execute<PagoLockRow>(
-      `SELECT ID_PAGO, ID_CLIENTE, MONTO, ESTADO
-         FROM CXC_PAGOS
-        WHERE ID_PAGO = :idPago
-        FOR UPDATE`,
-      { idPago: aplicacion.ID_PAGO },
-    );
-    const pago = pagoResult.rows?.[0];
-    if (!pago) throw new BadRequestError('El pago de la aplicación ya no existe');
 
     const montoAplicado = roundMoney(Number(aplicacion.MONTO_APLICADO));
     const nuevoSaldo = roundMoney(Number(documento.SALDO) + montoAplicado);

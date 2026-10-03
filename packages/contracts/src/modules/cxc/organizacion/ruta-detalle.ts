@@ -5,6 +5,7 @@ export const ESTADOS_VISITA = ['PENDIENTE', 'VISITADO', 'NO_ENCONTRADO', 'REPROG
 
 export const rutaDetalleSchema = z.object({
   idRutaDetalle: z.number().int(),
+  idDocumento: z.number().int().nullable().optional(),
   idRuta: z.number().int(),
   idCliente: z.number().int(),
   nombreCliente: z.string().nullable().optional(),

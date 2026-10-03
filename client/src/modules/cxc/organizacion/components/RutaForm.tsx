@@ -49,7 +49,7 @@ export const RutaForm = ({ ruta, onSuccess, onCancel }: RutaFormProps) => {
     }
     const nameErr = validateRequired(nombre, 'El nombre');
     if (nameErr) next.nombre = nameErr;
-    const nameMax = validateMaxLength(nombre, 'El nombre', 150);
+    const nameMax = validateMaxLength(nombre, 'El nombre', 120);
     if (nameMax) next.nombre = nameMax;
     const empErr = validateRequiredSelect(idEmpleado, 'un empleado responsable');
     if (empErr) next.idEmpleado = empErr;
@@ -121,7 +121,7 @@ export const RutaForm = ({ ruta, onSuccess, onCancel }: RutaFormProps) => {
         <TextInput
           label="Nombre"
           required
-          maxLength={150}
+          maxLength={120}
           value={nombre}
           onChange={(e: any) => setNombre(e.target.value)}
           error={errors.nombre ?? (nombre ? validationErrors.nombre : undefined)}
