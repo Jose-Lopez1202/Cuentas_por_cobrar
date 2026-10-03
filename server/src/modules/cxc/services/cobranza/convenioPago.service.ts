@@ -55,6 +55,8 @@ function generarPlanDeCuotas(montoDeuda: number, numeroCuotas: number, fechaConv
 export async function createConvenio(rawInput: unknown): Promise<ConvenioPago> {
   const input = createConvenioPagoSchema.parse(rawInput);
   if (input.fechaConvenio > businessTodayIso()) throw new BadRequestError('La fecha del convenio no puede ser futura');
+  if (input.estado !== 'ACTIVO') throw new BadRequestError('Un convenio nuevo debe iniciar como ACTIVO.');
+  if (input.estado !== 'ACTIVO') throw new BadRequestError('Un convenio nuevo debe iniciar como ACTIVO.');
   if (!(await catalogosRepository.clienteExiste(input.idCliente))) throw new BadRequestError('El cliente seleccionado no existe');
   if (!(await catalogosRepository.clienteElegibleParaConvenio(input.idCliente))) {
     throw new BadRequestError('El cliente debe tener al menos una promesa incumplida o una mora vigente antes de generar un convenio.');

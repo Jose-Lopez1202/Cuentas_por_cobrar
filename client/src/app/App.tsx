@@ -2,6 +2,10 @@ import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom'
 import { ComponentShowcase } from '../components/ui/ComponentShowcase';
 import { routes } from './routes';
 import { AppErrorBoundary } from '../shared/components';
+<<<<<<< HEAD
+=======
+import { ToastProvider } from '../shared/components/Toast';
+>>>>>>> origin/develop
 
 const router = createBrowserRouter([
   { path: '/', element: <Navigate to="/cxc/documentos/documentos" replace /> },
@@ -26,7 +30,13 @@ export default function App() {
   return (
     <AppErrorBoundary>
       <div className="erp-app min-h-screen bg-slate-50">
+<<<<<<< HEAD
         <RouterProvider router={router} />
+=======
+        <ToastProvider>
+          <RouterProvider router={router} />
+        </ToastProvider>
+>>>>>>> origin/develop
       </div>
     </AppErrorBoundary>
   );

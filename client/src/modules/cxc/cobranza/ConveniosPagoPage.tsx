@@ -20,6 +20,10 @@ export const ConveniosPagoPage = () => {
   const [convenioAEliminar, setConvenioAEliminar] = useState<ConvenioPago | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRecalculando, setIsRecalculando] = useState(false);
+<<<<<<< HEAD
+=======
+  const [confirmRecalcularOpen, setConfirmRecalcularOpen] = useState(false);
+>>>>>>> origin/develop
   const [recalculoMensaje, setRecalculoMensaje] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -44,6 +48,10 @@ export const ConveniosPagoPage = () => {
   };
 
   const handleRecalcular = async () => {
+<<<<<<< HEAD
+=======
+    setConfirmRecalcularOpen(false);
+>>>>>>> origin/develop
     setIsRecalculando(true);
     setRecalculoMensaje(null);
     try {
@@ -65,7 +73,11 @@ export const ConveniosPagoPage = () => {
           <p className="text-sm text-slate-500">Planes de pago a cuotas acordados con clientes en mora. Pagar una cuota reduce el saldo real de los documentos que cubre el convenio.</p>
         </div>
         <div className="flex gap-2">
+<<<<<<< HEAD
           <Button variant="secondary" icon={RefreshCw} onClick={handleRecalcular} disabled={isRecalculando}>
+=======
+          <Button variant="secondary" icon={RefreshCw} onClick={() => setConfirmRecalcularOpen(true)} disabled={isRecalculando}>
+>>>>>>> origin/develop
             {isRecalculando ? 'Recalculando...' : 'Recalcular incumplimiento'}
           </Button>
           <Button icon={Plus} onClick={() => setIsCreateOpen(true)}>
@@ -145,6 +157,19 @@ export const ConveniosPagoPage = () => {
       </Modal>
 
       <ConfirmDialog
+<<<<<<< HEAD
+=======
+        isOpen={confirmRecalcularOpen}
+        onClose={() => setConfirmRecalcularOpen(false)}
+        onConfirm={handleRecalcular}
+        title="Confirmar recálculo"
+        description="¿Estás seguro de recalcular el incumplimiento? Los convenios con cuotas vencidas sin pagar se marcarán como INCUMPLIDO."
+        confirmLabel="Sí, recalcular"
+        variant="primary"
+      />
+
+      <ConfirmDialog
+>>>>>>> origin/develop
         isOpen={!!convenioAEliminar}
         onClose={() => { setConvenioAEliminar(null); setDeleteError(null); }}
         onConfirm={handleDelete}
