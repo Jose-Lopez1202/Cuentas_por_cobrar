@@ -3,10 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { AlertTriangle, ArrowLeft, DollarSign, Save, X } from 'lucide-react';
 import { DataTable, StatusBadge, Button, TextInput, Select } from '../../../shared/ui-kit';
 import { Modal } from '../../../shared/components';
-<<<<<<< HEAD
-=======
 import { ConfirmDialog } from '../../../shared/components/ConfirmDialog';
->>>>>>> origin/develop
 import { apiClient, ApiError } from '../../../shared/api';
 import { formatDateGT } from '../../../shared/date';
 import { validateRequiredSelect, validateMoney, validateIdentifier, hasErrors, type ValidationErrors } from '../../../shared/validation';
@@ -31,10 +28,7 @@ export const ConvenioDetallePage = () => {
   const [idEmpleado, setIdEmpleado] = useState('');
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [isPaying, setIsPaying] = useState(false);
-<<<<<<< HEAD
-=======
   const [confirmPagoOpen, setConfirmPagoOpen] = useState(false);
->>>>>>> origin/develop
   const [payError, setPayError] = useState<string | null>(null);
 
   const cargar = useCallback(() => {
@@ -119,10 +113,7 @@ export const ConvenioDetallePage = () => {
   const isPayFormValid = !!cuotaAPagar && !hasErrors(payValidationErrors);
 
   const handlePagar = async () => {
-<<<<<<< HEAD
-=======
     setConfirmPagoOpen(false);
->>>>>>> origin/develop
     if (!cuotaAPagar) return;
     setPayError(null);
 
@@ -325,11 +316,7 @@ export const ConvenioDetallePage = () => {
             <Button
               variant={isPayFormValid ? 'success' : 'primary'}
               icon={Save}
-<<<<<<< HEAD
-              onClick={handlePagar}
-=======
               onClick={() => setConfirmPagoOpen(true)}
->>>>>>> origin/develop
               disabled={isPaying || !isPayFormValid}
               title={isPayFormValid ? 'Datos válidos: listo para registrar' : 'Revisa los campos y sus reglas'}
             >
@@ -338,8 +325,6 @@ export const ConvenioDetallePage = () => {
           </div>
         </div>
       </Modal>
-<<<<<<< HEAD
-=======
 
       <ConfirmDialog
         isOpen={confirmPagoOpen}
@@ -350,7 +335,6 @@ export const ConvenioDetallePage = () => {
         confirmLabel="Sí, registrar pago"
         variant="primary"
       />
->>>>>>> origin/develop
     </div>
   );
 };

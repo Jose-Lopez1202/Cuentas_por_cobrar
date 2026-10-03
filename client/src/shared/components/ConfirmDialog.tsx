@@ -1,7 +1,4 @@
-<<<<<<< HEAD
-=======
 import { useEffect } from 'react';
->>>>>>> origin/develop
 import { Modal } from './Modal';
 import { Button } from '../ui-kit';
 
@@ -32,8 +29,6 @@ export const ConfirmDialog = ({
   variant = 'danger',
   isLoading = false,
 }: ConfirmDialogProps) => {
-<<<<<<< HEAD
-=======
   // Escape cierra solo esta confirmación, no el modal de formulario que esté debajo.
   useEffect(() => {
     if (!isOpen) return;
@@ -47,7 +42,6 @@ export const ConfirmDialog = ({
     return () => window.removeEventListener('keydown', onKey, true);
   }, [isOpen, isLoading, onClose]);
 
->>>>>>> origin/develop
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title} size="sm">
       <p className="text-sm text-slate-600">{description}</p>
