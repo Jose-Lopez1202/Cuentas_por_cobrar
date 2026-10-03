@@ -4,7 +4,15 @@ import * as sucursalController from '../../controllers/organizacion/sucursal.con
 import * as rutaController from '../../controllers/organizacion/ruta.controller';
 import * as rutaDetalleController from '../../controllers/organizacion/rutaDetalle.controller';
 
+import * as operacion from '../../controllers/organizacion/rutaOperacion.controller';
 const router = Router();
+router.get('/rutas-pagos-disponibles', operacion.pagosDisponibles);
+router.post('/rutas/:id/cobros', operacion.cobrar);
+router.get('/rutas-documentos-pendientes', operacion.pendientes);
+router.get('/rutas/:id/operacion', operacion.resumen);
+router.post('/rutas/:id/asignaciones', operacion.asignar);
+router.post('/rutas/:id/bitacora', operacion.registrar);
+router.patch('/cobradores/:idEmpleado/perfil', operacion.perfil);
 
 // --- Empresas ---
 // /options va ANTES de /:id para que Express no confunda "options" con un id.

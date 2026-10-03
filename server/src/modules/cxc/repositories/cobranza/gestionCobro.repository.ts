@@ -1,7 +1,13 @@
 import oracledb from 'oracledb';
+import { ConflictError, NotFoundError } from '../../../../shared/errors/AppError';
 import { getConnection } from '../../../../config/database';
 import type { GestionCobro, CreateGestionCobroInput, UpdateGestionCobroInput } from '@erp/contracts';
 
+async function guardGestion(conn: Awaited<ReturnType<typeof getConnection>>, id:number) {
+  const result=await conn.execute<{ID_RUTA_DETALLE:number|null}>('SELECT ID_RUTA_DETALLE FROM CXC_GESTIONES_COBRO WHERE ID_GESTION=:id FOR UPDATE',{id});
+  if(!result.rows?.length) throw new NotFoundError('Gestión no encontrada');
+  if(result.rows[0].ID_RUTA_DETALLE!==null) throw new ConflictError('La bitácora de ruta es permanente; agrega otra gestión para aclarar o corregir');
+}
 interface GestionCobroRow {
   ID_GESTION: number;
   ID_CLIENTE: number;
@@ -146,6 +152,7 @@ export async function update(id: number, input: UpdateGestionCobroInput): Promis
 
   const conn = await getConnection();
   try {
+    await guardGestion(conn,id);
     await conn.execute(
       `UPDATE CXC_GESTIONES_COBRO SET ${fields.join(', ')} WHERE ID_GESTION = :id`,
       binds,
@@ -162,6 +169,7 @@ export async function update(id: number, input: UpdateGestionCobroInput): Promis
 export async function remove(id: number): Promise<void> {
   const conn = await getConnection();
   try {
+    await guardGestion(conn,id);
     await conn.execute(`DELETE FROM CXC_GESTIONES_COBRO WHERE ID_GESTION = :id`, { id });
     await conn.commit();
   } catch (err) {
