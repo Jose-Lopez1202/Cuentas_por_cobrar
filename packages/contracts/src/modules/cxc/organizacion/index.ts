@@ -5,3 +5,5 @@ export * from './empresa';
 export * from './sucursal';
 export * from './ruta';
 export * from './ruta-detalle';
+
+export * from './ruta-operacion';

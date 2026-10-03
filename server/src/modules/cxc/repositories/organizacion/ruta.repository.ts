@@ -1,7 +1,7 @@
 import oracledb from 'oracledb';
 import { getConnection } from '../../../../config/database';
 import type { Ruta, CreateRutaInput, UpdateRutaInput } from '@erp/contracts';
-import { NotFoundError } from '../../../../shared/errors/AppError';
+import { NotFoundError, ConflictError } from '../../../../shared/errors/AppError';
 
 interface RutaRow {
   ID_RUTA: number;
@@ -129,6 +129,11 @@ export async function update(id: number, input: UpdateRutaInput): Promise<void> 
 
   const conn = await getConnection();
   try {
+    const actual = await conn.execute<{ ESTADO: string }>('SELECT ESTADO FROM CXC_RUTAS WHERE ID_RUTA=:id FOR UPDATE', { id });
+    if (!actual.rows?.length) throw new NotFoundError(`Ruta ${id} no encontrada`);
+    if (['COMPLETADA', 'CANCELADA'].includes(actual.rows[0].ESTADO.trim())) {
+      throw new ConflictError('Una ruta cerrada conserva su historial y no puede modificarse; crea otra ruta');
+    }
     const result = await conn.execute(`UPDATE CXC_RUTAS SET ${fields.join(', ')} WHERE ID_RUTA = :id`, binds);
     if (!result.rowsAffected) throw new NotFoundError(`Ruta ${id} no encontrada`);
     await conn.commit();
@@ -143,6 +148,11 @@ export async function update(id: number, input: UpdateRutaInput): Promise<void> 
 export async function remove(id: number): Promise<void> {
   const conn = await getConnection();
   try {
+    const ruta=await conn.execute<{ESTADO:string}>('SELECT ESTADO FROM CXC_RUTAS WHERE ID_RUTA=:id FOR UPDATE',{id});
+    if(!ruta.rows?.length) throw new NotFoundError('Ruta no encontrada');
+    if(['COMPLETADA','CANCELADA'].includes(ruta.rows[0].ESTADO.trim())) throw new ConflictError('Una ruta cerrada conserva su historial');
+    const detalle=await conn.execute<{TOTAL:number}>('SELECT COUNT(*) TOTAL FROM CXC_RUTA_DETALLE WHERE ID_RUTA=:id',{id});
+    if((detalle.rows?.[0]?.TOTAL ?? 0)>0) throw new ConflictError('La ruta tiene paradas o documentos; cancélala para conservar su historial');
     const result = await conn.execute(`DELETE FROM CXC_RUTAS WHERE ID_RUTA = :id`, { id });
     if (!result.rowsAffected) throw new NotFoundError(`Ruta ${id} no encontrada`);
     await conn.commit();

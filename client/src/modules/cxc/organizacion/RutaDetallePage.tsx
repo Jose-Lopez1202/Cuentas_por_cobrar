@@ -6,6 +6,7 @@ import { Modal } from '../../../shared/components';
 import { ConfirmDialog } from '../../../shared/components/ConfirmDialog';
 import { apiClient, ApiError } from '../../../shared/api';
 import type { Ruta, RutaDetalle } from '@erp/contracts';
+import { RutaOperacionPanel } from './components/RutaOperacionPanel';
 import { RutaDetalleForm } from './components/RutaDetalleForm';
 
 export const RutaDetallePage = () => {
@@ -89,9 +90,11 @@ export const RutaDetallePage = () => {
         </p>
       )}
 
+      {ruta && <RutaOperacionPanel idRuta={idRuta} estado={ruta.estado} />}
+      <h2 className="text-lg font-bold">Paradas generales de la ruta</h2>
       <DataTable
         isLoading={isLoading}
-        data={paradas}
+        data={paradas.filter(p => !p.idDocumento)}
         emptyText="Esta ruta todavía no tiene paradas registradas"
         columns={[
           { header: 'Orden', accessorKey: 'ordenVisita', cell: ({ value }: any) => value ?? '—' },

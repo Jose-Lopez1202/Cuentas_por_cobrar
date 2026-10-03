@@ -5,6 +5,7 @@ export const ESTADOS_APLICACION_PAGO = ['CONFIRMADA', 'REVERSADA'] as const;
 
 export const aplicacionPagoSchema = z.object({
   idAplicacion: z.number().int(),
+  idRutaDetalle: z.number().int().nullable().optional(),
   idPago: z.number().int(),
   referenciaPago: z.string().nullable().optional(),
   idDocumento: z.number().int(),
@@ -22,6 +23,8 @@ export const aplicacionPagoSchema = z.object({
 export type AplicacionPago = z.infer<typeof aplicacionPagoSchema>;
 
 export const createAplicacionPagoSchema = z.object({
+  idRutaDetalle: z.number().int().positive().optional(),
+  claveRuta: z.string().uuid().optional(),
   idPago: z.number().int().positive('El pago es obligatorio'),
   idDocumento: z.number().int().positive('El documento es obligatorio'),
   fechaAplicacion: isoDateSchema('La fecha de aplicación'),

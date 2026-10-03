@@ -30,6 +30,7 @@ export async function getAplicacionPago(id: number): Promise<AplicacionPago> {
 
 export async function createAplicacionPago(raw: unknown): Promise<AplicacionPago> {
   const input = createAplicacionPagoSchema.parse(raw);
+  if (Boolean(input.idRutaDetalle) !== Boolean(input.claveRuta)) throw new BadRequestError('La aplicación de ruta requiere detalle y clave de operación');
   if (input.fechaAplicacion > businessTodayIso()) {
     throw new BadRequestError('La fecha de aplicación no puede ser futura');
   }
