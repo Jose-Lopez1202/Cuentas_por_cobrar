@@ -108,7 +108,7 @@ export function FormaPagoForm({
         onCancel={onCancel}
         isSubmitting={busy}
         isEditing={isEditing}
-        isFormValid={isFormValid}
+        isFormValid={isFormValid} blockers={validationErrors}
         createLabel="Guardar forma"
       />
     </form>

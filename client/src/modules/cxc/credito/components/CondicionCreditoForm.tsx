@@ -73,6 +73,6 @@ export const CondicionCreditoForm = ({ condicion, onSuccess, onCancel }: Condici
       <Select label="Estado" required value={estado} onChange={(e: any) => setEstado(e.target.value)} options={ESTADO_OPTIONS} error={errors.estado} helperText="Define si la condición puede utilizarse actualmente." />
     </div>
     {formError && <p className="text-sm text-red-600 font-medium bg-red-50 border border-red-200 rounded-lg px-3 py-2">{formError}</p>}
-    <FormActionButtons onCancel={onCancel} isSubmitting={isSubmitting} isEditing={isEditing} createLabel="Crear condición" isFormValid={isFormValid} />
+    <FormActionButtons onCancel={onCancel} isSubmitting={isSubmitting} isEditing={isEditing} createLabel="Crear condición" isFormValid={isFormValid} blockers={validate()} />
   </form>;
 };

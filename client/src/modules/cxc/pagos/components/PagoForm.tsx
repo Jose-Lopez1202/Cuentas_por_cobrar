@@ -295,7 +295,7 @@ export function PagoForm({
         onCancel={onCancel}
         isSubmitting={busy}
         isEditing={isEditing}
-        isFormValid={isFormValid}
+        isFormValid={isFormValid} blockers={validationErrors} lockedReason={isLocked ? "El pago ya tiene aplicaciones o está cerrado; debe reversarse antes de modificarlo." : undefined}
         createLabel="Guardar pago"
       />
     </form>

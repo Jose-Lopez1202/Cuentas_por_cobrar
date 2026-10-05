@@ -332,7 +332,7 @@ export const DocumentoForm = ({ documento, onSuccess, onCancel }: Props) => {
         onCancel={onCancel}
         isSubmitting={isSubmitting}
         isEditing={isEditing}
-        isFormValid={isFormValid}
+        isFormValid={isFormValid} blockers={validationErrors} lockedReason={isLocked ? "El documento ya tiene movimientos o está cerrado; corrígelo con reversa, nota de crédito o ajuste autorizado." : undefined}
         createLabel="Crear documento"
       />
     </form>

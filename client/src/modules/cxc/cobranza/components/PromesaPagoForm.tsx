@@ -81,7 +81,7 @@ export const PromesaPagoForm = ({ promesa, onSuccess, onCancel }: PromesaPagoFor
       </div>
       <TextArea label="Observaciones" value={observaciones} onChange={(e: any) => setObservaciones(e.target.value)} rows={3} maxLength={500} error={errors.observaciones} helperText="Detalle adicional; máximo 500 caracteres." />
       {formError && <p role="alert" className="text-sm text-red-600 font-medium bg-red-50 border border-red-200 rounded-lg px-3 py-2">{formError}</p>}
-      <FormActionButtons onCancel={onCancel} isSubmitting={isSubmitting} isEditing={isEditing} createLabel="Crear promesa" isFormValid={isFormValid} />
+      <FormActionButtons onCancel={onCancel} isSubmitting={isSubmitting} isEditing={isEditing} createLabel="Crear promesa" isFormValid={isFormValid} blockers={validationErrors} />
     </form>
   );
 };

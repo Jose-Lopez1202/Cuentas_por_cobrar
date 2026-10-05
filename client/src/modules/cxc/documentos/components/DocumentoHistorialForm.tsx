@@ -160,7 +160,7 @@ export const DocumentoHistorialForm = ({
         onCancel={onCancel}
         isSubmitting={isSubmitting}
         isEditing={isEditing}
-        isFormValid={isFormValid}
+        isFormValid={isFormValid} blockers={validationErrors}
         createLabel="Agregar historial"
       />
     </form>

@@ -87,6 +87,6 @@ export const AplicacionNotaCreditoForm = ({ aplicacion, onSuccess, onCancel }: A
       <TextInput label="Fecha de aplicación" type="date" required max={todayIso()} value={fechaAplicacion} onChange={(e:any)=>setFechaAplicacion(e.target.value)} error={errors.fechaAplicacion} helperText="Fecha real de la aplicación; no puede ser futura." />
     </div>
     {formError && <p className="text-sm text-red-600 font-medium bg-red-50 border border-red-200 rounded-lg px-3 py-2">{formError}</p>}
-    <FormActionButtons onCancel={onCancel} isSubmitting={isSubmitting} isEditing={isEditing} createLabel="Crear aplicación" isFormValid={isFormValid} />
+    <FormActionButtons onCancel={onCancel} isSubmitting={isSubmitting} isEditing={isEditing} createLabel="Crear aplicación" isFormValid={isFormValid} blockers={validate()} />
   </form>;
 };
