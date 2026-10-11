@@ -1,9 +1,18 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { MapPin, UserRound, Wallet, ClipboardList, RefreshCw } from 'lucide-react';
 import type { RutaOperacion, CobradorPerfil, RutaDocumentoPendiente, RutaPagoDisponible, CatalogoOption } from '@erp/contracts';
 import { apiClient, ApiError } from '../../../../shared/api';
 import { todayIso } from '../../../../shared/validation';
+
+// Los input type="number" aceptan e, E, + y - (notación científica); los bloqueamos.
+const soloNumeros = (e: KeyboardEvent<HTMLInputElement>) => {
+  if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault();
+};
+// Para latitud/longitud sí se permite el signo menos.
+const soloCoordenadas = (e: KeyboardEvent<HTMLInputElement>) => {
+  if (['e', 'E', '+'].includes(e.key)) e.preventDefault();
+};
 
 const field = 'border border-slate-300 rounded-lg px-3 py-2 w-full bg-white mt-1';
 const action = 'bg-blue-600 text-white rounded-lg px-4 py-2 font-medium disabled:opacity-50';
@@ -105,9 +114,9 @@ export function RutaOperacionPanel({ idRuta, estado }: { idRuta: number; estado:
       {!closed && <form onSubmit={e => submit(e, 'asignacion')} className={`${card} grid md:grid-cols-2 gap-3`}><h3 className="md:col-span-2 font-bold">Asignar documento pendiente</h3>
         <label>Documento<select className={field} name="documento" required><option value="">Seleccionar</option>{docs.filter(d => d.DISPONIBLE>0 && !data?.asignaciones.some(a => a.ID_DOCUMENTO===d.ID_DOCUMENTO)).map(d => <option value={d.ID_DOCUMENTO} key={d.ID_DOCUMENTO}>{d.DOCUMENTO} · {d.CLIENTE} · disponible {d.MONEDA} {money(d.DISPONIBLE)}</option>)}</select></label>
         <label>Cobrador<select className={field} name="empleado" required><option value="">Seleccionar</option>{empleados.map(e => <option key={e.id} value={e.id}>{e.label}</option>)}</select></label>
-        <label>Monto asignado<input className={field} name="monto" type="number" min="0.01" step="0.01" required/></label><label>Orden de visita<input className={field} name="orden" type="number" min="1" step="1" defaultValue={(data?.asignaciones.length ?? 0)+1} required/></label>
+        <label>Monto asignado<input className={field} name="monto" type="number" min="0.01" step="0.01" required onKeyDown={soloNumeros}/></label><label>Orden de visita<input className={field} name="orden" type="number" min="1" step="1" onKeyDown={soloNumeros} defaultValue={(data?.asignaciones.length ?? 0)+1} required/></label>
         <label className="md:col-span-2">Dirección<input className={field} name="direccion" maxLength={250} required/></label>
-        <label>Latitud<input className={field} name="latitud" type="number" min="-90" max="90" step="any" placeholder="Ej. 14.6349" required/></label><label>Longitud<input className={field} name="longitud" type="number" min="-180" max="180" step="any" placeholder="Ej. -90.5069" required/></label>
+        <label>Latitud<input className={field} name="latitud" type="number" onKeyDown={soloCoordenadas} min="-90" max="90" step="any" placeholder="Ej. 14.6349" required/></label><label>Longitud<input className={field} name="longitud" type="number" onKeyDown={soloCoordenadas} min="-180" max="180" step="any" placeholder="Ej. -90.5069" required/></label>
         <button disabled={busy || !data} className={action}>Asignar documento</button></form>}
       <div className="overflow-x-auto bg-white border rounded-xl"><table className="w-full text-sm text-left"><thead className="bg-slate-50"><tr>{['Documento / cliente','Cobrador','Asignado','Cobrado aplicado','Restante asignado','Saldo actual documento','Avance / visita'].map(h => <th className="p-3 whitespace-nowrap" key={h}>{h}</th>)}</tr></thead><tbody>{data?.asignaciones.map(a => <tr key={a.ID_ASIGNACION} className="border-t"><td className="p-3">{a.DOCUMENTO}<br/><span className="text-slate-500">{a.CLIENTE}</span></td><td className="p-3">{a.COBRADOR}</td><td className="p-3">{a.MONEDA} {money(a.MONTO_ASIGNADO)}</td><td className="p-3 text-emerald-700">{money(a.MONTO_REGISTRADO)}</td><td className="p-3">{money(a.MONTO_ASIGNADO-a.MONTO_REGISTRADO)}</td><td className="p-3">{money(a.SALDO_DOCUMENTO)}</td><td className="p-3">{(100*a.MONTO_REGISTRADO/a.MONTO_ASIGNADO).toFixed(1)}%<br/>{a.ESTADO_VISITA}</td></tr>)}</tbody></table>{data?.asignaciones.length===0 && <p className="p-4 text-slate-500">Sin documentos asignados.</p>}</div>
     </>}
@@ -118,7 +127,7 @@ export function RutaOperacionPanel({ idRuta, estado }: { idRuta: number; estado:
         <label>Pago disponible<select key={cobroDetalle} name="pago" className={field} required><option value="">Seleccionar pago</option>{pagosCliente.map(p => <option key={p.ID_PAGO} value={p.ID_PAGO}>{p.REFERENCIA} · {p.MONEDA} {money(p.DISPONIBLE)}</option>)}</select></label>
         <label>Empleado que registra<select name="registrador" className={field} required><option value="">Seleccionar</option>{empleados.map(e => <option key={e.id} value={e.id}>{e.label}</option>)}</select></label>
         {cobro && pagosCliente.length===0 && <p className="md:col-span-2 text-amber-700 text-sm">No hay pagos disponibles de este cliente y moneda. Registra uno en Pagos y actualiza la vista.</p>}
-        <label>Monto a aplicar<input name="monto" className={field} type="number" min="0.01" step="0.01" required max={cobro ? Math.max(0,Math.min(cobro.MONTO_ASIGNADO-cobro.MONTO_REGISTRADO,cobro.SALDO_DOCUMENTO)) : undefined}/></label>
+        <label>Monto a aplicar<input name="monto" className={field} type="number" onKeyDown={soloNumeros} min="0.01" step="0.01" required max={cobro ? Math.max(0,Math.min(cobro.MONTO_ASIGNADO-cobro.MONTO_REGISTRADO,cobro.SALDO_DOCUMENTO)) : undefined}/></label>
         <label>Fecha de aplicación<input name="fecha" type="date" className={field} defaultValue={todayIso()} max={todayIso()} required/></label>
         <button className={action} disabled={busy || !cobro || pagosCliente.length===0}>Aplicar cobro y generar recibo</button>
       </form>}
