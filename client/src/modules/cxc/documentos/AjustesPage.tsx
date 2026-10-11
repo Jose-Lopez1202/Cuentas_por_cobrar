@@ -133,7 +133,7 @@ function AprobacionModal({
           onCancel={onClose}
           isSubmitting={busy}
           isEditing={false}
-          isFormValid={isFormValid}
+          isFormValid={isFormValid} blockers={validationErrors}
           createLabel={accion === 'aprobar' ? (esSegundaAprobacion ? 'Confirmar 2da aprobación' : 'Dar 1ra aprobación') : 'Rechazar'}
         />
       </form>

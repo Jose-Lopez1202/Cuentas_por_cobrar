@@ -145,7 +145,7 @@ export const TipoDocumentoForm = ({ tipo, onSuccess, onCancel }: Props) => {
         onCancel={onCancel}
         isSubmitting={isSubmitting}
         isEditing={isEditing}
-        isFormValid={isFormValid}
+        isFormValid={isFormValid} blockers={validationErrors}
         createLabel="Crear tipo"
       />
     </form>

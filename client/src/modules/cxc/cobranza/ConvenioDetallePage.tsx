@@ -309,6 +309,15 @@ export const ConvenioDetallePage = () => {
 
           {payError && <p className="text-sm text-red-600 font-medium">{payError}</p>}
 
+          {!isPayFormValid && !isPaying && (
+            <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              <p className="font-semibold">No se puede registrar el pago todavía porque:</p>
+              <ul className="mt-1 list-disc pl-5 space-y-0.5">
+                {Object.values(payValidationErrors).filter(Boolean).map((m) => <li key={m}>{m}</li>)}
+              </ul>
+            </div>
+          )}
+
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
             <Button variant="danger" icon={X} onClick={() => setCuotaAPagar(null)} disabled={isPaying}>
               Cancelar

@@ -185,7 +185,7 @@ export const RutaForm = ({ ruta, onSuccess, onCancel }: RutaFormProps) => {
         onCancel={onCancel}
         isSubmitting={isSubmitting}
         isEditing={isEditing}
-        isFormValid={isFormValid}
+        isFormValid={isFormValid} blockers={validationErrors}
         createLabel="Crear ruta"
       />
     </form>

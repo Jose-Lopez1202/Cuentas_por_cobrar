@@ -197,7 +197,7 @@ export function AnticipoForm({
         onCancel={onCancel}
         isSubmitting={busy}
         isEditing={isEditing}
-        isFormValid={isFormValid}
+        isFormValid={isFormValid} blockers={validationErrors} lockedReason={isLocked ? "El anticipo ya no está disponible, por lo que no admite cambios." : undefined}
         createLabel="Guardar anticipo"
       />
     </form>

@@ -226,7 +226,7 @@ export function AplicacionPagoForm({
         onCancel={onCancel}
         isSubmitting={busy}
         isEditing={isEditing}
-        isFormValid={isFormValid}
+        isFormValid={isFormValid} blockers={validationErrors}
         createLabel="Guardar aplicación"
       />
     </form>

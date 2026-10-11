@@ -12,6 +12,7 @@ export class AppError extends Error {
     public readonly statusCode: number,
     public readonly code: string,
     public readonly expose = true,
+    public readonly details?: Array<{ campo: string; mensaje: string }>,
   ) {
     super(message);
     this.name = new.target.name;
@@ -33,5 +34,18 @@ export class ConflictError extends AppError {
 export class BadRequestError extends AppError {
   constructor(message: string) {
     super(message, 400, 'BAD_REQUEST');
+  }
+}
+
+/** Rechazo del certificador simulado (SAT): 400 con el detalle por campo para el formulario. */
+export class SatRechazoError extends AppError {
+  constructor(errores: Array<{ codigo: string; campo: string; mensaje: string }>) {
+    super(
+      `La SAT (simulada) rechazó el documento: ${errores.map((e) => e.mensaje).join(' ')}`,
+      400,
+      'SAT_RECHAZO',
+      true,
+      errores.map((e) => ({ campo: e.campo, mensaje: `[${e.codigo}] ${e.mensaje}` })),
+    );
   }
 }

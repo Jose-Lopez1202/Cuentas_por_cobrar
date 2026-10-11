@@ -255,7 +255,7 @@ export const NotaCreditoForm = ({ nota, onSuccess, onCancel }: NotaCreditoFormPr
         isSubmitting={isSubmitting}
         isEditing={isEditing}
         createLabel="Crear nota de crédito"
-        isFormValid={isFormValid}
+        isFormValid={isFormValid} blockers={validationErrors} lockedReason={isLocked ? "La nota de crédito ya tiene aplicaciones o está cerrada; debe reversarse antes de modificarla." : undefined}
       />
     </form>
   );

@@ -48,7 +48,7 @@ export const DocumentoDetalleForm = ({ idDocumento, detalle, onSuccess, onCancel
 
     const precioErr = validateMoney(precioUnitario, 'El precio unitario', {
       required: true,
-      min: 0,
+      positive: true,
     });
     if (precioErr) next.precioUnitario = precioErr;
 
@@ -146,7 +146,7 @@ export const DocumentoDetalleForm = ({ idDocumento, detalle, onSuccess, onCancel
           type="number"
           restriction="decimal"
           decimalPlaces={2}
-          min={0}
+          min={0.01}
           step="0.01"
           required
           value={precioUnitario}
@@ -169,7 +169,7 @@ export const DocumentoDetalleForm = ({ idDocumento, detalle, onSuccess, onCancel
         onCancel={onCancel}
         isSubmitting={isSubmitting}
         isEditing={isEditing}
-        isFormValid={isFormValid}
+        isFormValid={isFormValid} blockers={validationErrors}
         createLabel="Agregar detalle"
       />
     </form>

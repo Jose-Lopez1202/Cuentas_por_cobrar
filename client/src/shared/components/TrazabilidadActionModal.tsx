@@ -113,6 +113,7 @@ export function TrazabilidadActionModal({
           isSubmitting={busy}
           isEditing={false}
           isFormValid={isFormValid}
+          blockers={validationErrors}
           createLabel={actionLabel}
         />
       </form>

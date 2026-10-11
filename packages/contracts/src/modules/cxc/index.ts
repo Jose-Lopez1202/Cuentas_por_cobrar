@@ -8,3 +8,4 @@ export * from './credito';
 export * from './documentos';
 export * from './dashboard';
 export * from './reportes';
+export * from './facturacion';
