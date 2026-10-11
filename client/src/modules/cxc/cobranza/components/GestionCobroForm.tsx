@@ -120,7 +120,7 @@ export const GestionCobroForm = ({ gestion, onSuccess, onCancel }: GestionCobroF
         </p>
       )}
       {formError && <p role="alert" className="text-sm text-red-600 font-medium bg-red-50 border border-red-200 rounded-lg px-3 py-2">{formError}</p>}
-      <FormActionButtons onCancel={onCancel} isSubmitting={isSubmitting} isEditing={isEditing} createLabel="Crear gestión" isFormValid={isFormValid} />
+      <FormActionButtons onCancel={onCancel} isSubmitting={isSubmitting} isEditing={isEditing} createLabel="Crear gestión" isFormValid={isFormValid} blockers={validationErrors} />
     </form>
   );
 };

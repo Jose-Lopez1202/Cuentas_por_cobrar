@@ -50,7 +50,7 @@ export const RutaDetalleForm = ({ idRuta, parada, onSuccess, onCancel }: RutaDet
     }
 
     if (montoPendiente) {
-      const montoErr = validateMoney(montoPendiente, 'El monto pendiente', { min: 0 });
+      const montoErr = validateMoney(montoPendiente, 'El monto pendiente', { positive: true });
       if (montoErr) next.montoPendiente = montoErr;
     }
 
@@ -149,12 +149,12 @@ export const RutaDetalleForm = ({ idRuta, parada, onSuccess, onCancel }: RutaDet
           type="number"
           restriction="decimal"
           decimalPlaces={2}
-          min={0}
+          min={0.01}
           step="0.01"
           value={montoPendiente}
           onChange={(e: any) => setMontoPendiente(e.target.value)}
           error={errors.montoPendiente ?? (montoPendiente ? validationErrors.montoPendiente : undefined)}
-          helperText="Monto de referencia; no negativo, máximo 2 decimales."
+          helperText="Monto de referencia mayor a 0; máximo 2 decimales."
         />
         <Select
           label="Estado de visita"
@@ -185,7 +185,7 @@ export const RutaDetalleForm = ({ idRuta, parada, onSuccess, onCancel }: RutaDet
         onCancel={onCancel}
         isSubmitting={isSubmitting}
         isEditing={isEditing}
-        isFormValid={isFormValid}
+        isFormValid={isFormValid} blockers={validationErrors}
         createLabel="Agregar parada"
       />
     </form>

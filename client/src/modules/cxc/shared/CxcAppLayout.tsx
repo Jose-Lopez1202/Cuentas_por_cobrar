@@ -7,6 +7,7 @@ import {
   Coins,
   CreditCard,
   FileSpreadsheet,
+  FileText,
   GraduationCap,
   HelpCircle,
   Landmark,
@@ -53,6 +54,15 @@ type CxcMenuGroup = {
  */
 const CXC_GROUPS: CxcMenuGroup[] = [
   {
+    id: 'facturacion',
+    label: 'Facturación',
+    icon: FileText,
+    matchPrefix: '/cxc/facturacion',
+    items: [
+      { id: 'facturas', label: 'Facturas (FEL)', path: '/cxc/facturacion/facturas' },
+    ],
+  },
+  {
     id: 'reportes',
     label: 'Reportes',
     icon: BarChart3,
@@ -60,6 +70,9 @@ const CXC_GROUPS: CxcMenuGroup[] = [
     items: [
       { id: 'antiguedad-saldos', label: 'Antigüedad de Saldos', path: '/cxc/reportes/antiguedad-saldos' },
       { id: 'estado-cuenta', label: 'Estado de Cuenta', path: '/cxc/reportes/estado-cuenta' },
+      { id: 'libro-ventas', label: 'Libro de Ventas', path: '/cxc/reportes/libro-ventas' },
+      { id: 'estadistica-ventas', label: 'Estadística de Ventas', path: '/cxc/reportes/estadistica-ventas' },
+      { id: 'estadistica-cobranza', label: 'Estadística de Cobranza', path: '/cxc/reportes/estadistica-cobranza' },
     ],
   },
   {

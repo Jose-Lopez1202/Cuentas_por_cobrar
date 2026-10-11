@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useRef } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 
 const DEFAULT_DATE_MIN = '1900-01-01';
@@ -159,6 +159,7 @@ export const TextInput = ({
   const inputId = id || `input-${slug(label)}-${reactId}`;
   const errorId = `${inputId}-error`;
   const helpId = `${inputId}-help`;
+  const [touched, setTouched] = useState(false);
 
   const inferredRestriction = restriction ?? (
     type === 'number'
@@ -226,12 +227,19 @@ export const TextInput = ({
   };
 
   const handleBlur = (event) => {
+    setTouched(true);
     if (uppercase && typeof event.target.value === 'string') {
       event.target.value = event.target.value.toUpperCase().trim();
       onChange?.(event);
     }
     onBlur?.(event);
   };
+
+  // Error visible: el que manda el formulario o, tras salir del campo, el propio de la regla.
+  const internalError = touched && !isReadOnly
+    ? semanticValidityMessage({ value, restriction: inferredRestriction, min, max, required, label })
+    : '';
+  error = error || internalError || undefined;
 
   return (
     <div className={`w-full flex flex-col gap-1.5 ${className}`}>
@@ -312,6 +320,10 @@ export const Select = ({
   const selectId = id || `select-${slug(label)}-${reactId}`;
   const errorId = `${selectId}-error`;
   const helpId = `${selectId}-help`;
+  const [touched, setTouched] = useState(false);
+  if (!error && touched && required && !isReadOnly && (value === undefined || value === null || String(value) === '')) {
+    error = `Debes seleccionar ${label ? label.toLowerCase() : 'una opción'}.`;
+  }
   const resolvedHelperText = helperText ?? (
     label ? `Selecciona ${label.toLowerCase()}${required ? '; campo obligatorio' : ''}.` : undefined
   );
@@ -336,6 +348,7 @@ export const Select = ({
           id={selectId}
           value={value}
           onChange={onChange}
+          onBlur={(event) => { setTouched(true); props.onBlur?.(event); }}
           disabled={isReadOnly}
           required={required}
           aria-required={required || undefined}
@@ -394,6 +407,10 @@ export const TextArea = ({
   const areaId = id || `area-${slug(label)}-${reactId}`;
   const errorId = `${areaId}-error`;
   const helpId = `${areaId}-help`;
+  const [touched, setTouched] = useState(false);
+  if (!error && touched && required && !isReadOnly && String(value ?? '').trim() === '') {
+    error = `${label || 'El campo'} es obligatorio.`;
+  }
   const resolvedHelperText = helperText ?? (
     label ? `Describe ${label.toLowerCase()}${maxLength ? ` (máx. ${maxLength} caracteres)` : ''}.` : undefined
   );
@@ -412,6 +429,7 @@ export const TextArea = ({
         rows={rows}
         value={value}
         onChange={onChange}
+        onBlur={(event) => { setTouched(true); props.onBlur?.(event); }}
         readOnly={isReadOnly}
         placeholder={placeholder}
         required={required}

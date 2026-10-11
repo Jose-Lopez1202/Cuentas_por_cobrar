@@ -29,6 +29,7 @@ export function errorHandler(
     res.status(err.statusCode).json({
       error: err.expose ? err.message : 'No fue posible completar la operación',
       code: err.code,
+      ...(err.details ? { details: err.details } : {}),
     });
     return;
   }

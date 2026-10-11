@@ -256,7 +256,7 @@ export const AjusteForm = ({ ajuste, onSuccess, onCancel }: Props) => {
         onCancel={onCancel}
         isSubmitting={isSubmitting}
         isEditing={isEditing}
-        isFormValid={isFormValid}
+        isFormValid={isFormValid} blockers={validationErrors} lockedReason={isLocked ? "El ajuste ya no está pendiente, por lo que no admite cambios." : undefined}
         createLabel="Registrar ajuste"
       />
     </form>

@@ -126,7 +126,7 @@ export const EmpresaForm = ({ empresa, onSuccess, onCancel }: EmpresaFormProps) 
         onCancel={onCancel}
         isSubmitting={isSubmitting}
         isEditing={isEditing}
-        isFormValid={isFormValid}
+        isFormValid={isFormValid} blockers={validationErrors}
         createLabel="Crear empresa"
       />
     </form>

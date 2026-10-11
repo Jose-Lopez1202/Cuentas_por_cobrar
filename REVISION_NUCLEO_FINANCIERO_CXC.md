@@ -122,3 +122,10 @@ La reversa del caso de pago mal aplicado ya está resuelta (`reversar()` con tra
 - `server/.env` conservado para ejecución local, según la instrucción del proyecto.
 
 > Nota: no se pudo ejecutar el empaquetado final de Vite dentro del contenedor porque los `node_modules` del ZIP provienen de una instalación PNPM de Windows y sus enlaces internos no son portables al entorno Linux. En el equipo local se debe ejecutar `pnpm install` y luego `pnpm build` para la comprobación final del bundle.
+
+## Facturación FEL simulada y reportes fiscales (migración 007)
+
+- **Qué hace:** `POST /cxc/facturas` valida contra un certificador SAT **simulado** ([satSimulator.ts](server/src/modules/cxc/shared/satSimulator.ts)): NIT con dígito verificador (módulo 11), Consumidor Final con tope de Q2,500, IVA 12% incluido en el precio, fecha no futura, emisor con NIT válido. Si pasa, en una sola transacción crea el documento por cobrar (tipo `FACT`), sus líneas y el certificado `CXC_FACTURA_FEL` (UUID, serie/número FEL, XML DTE simplificado). `POST /cxc/facturas/validar` corre las mismas reglas sin guardar. Anular exige que la factura no tenga pagos/NC/ajustes aplicados.
+- **No es fiscal:** no hay conexión ni certificados reales con la SAT; el XML y el UUID son generados localmente.
+- **Reportes** (solo lectura): `/cxc/reportes/libro-ventas`, `/estadistica-ventas`, `/estadistica-cobranza` (más CSV en esas pantallas y en Antigüedad de Saldos).
+- **Pendiente de ejecutar:** `database/oracle/01_ddl/007_facturacion_fel_simulada.sql`. Además, la empresa (Organización > Empresas) necesita un **NIT válido**; sin él la emisión se rechaza con ese motivo.

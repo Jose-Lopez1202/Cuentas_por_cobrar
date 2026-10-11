@@ -140,7 +140,7 @@ export const SucursalForm = ({ sucursal, onSuccess, onCancel }: SucursalFormProp
         onCancel={onCancel}
         isSubmitting={isSubmitting}
         isEditing={isEditing}
-        isFormValid={isFormValid}
+        isFormValid={isFormValid} blockers={validationErrors}
         createLabel="Crear sucursal"
       />
     </form>
