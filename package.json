@@ -9,10 +9,18 @@
     "build": "pnpm --filter \"@erp/*\" build",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:report": "playwright show-report"
+    "test:e2e:report": "playwright show-report",
+    "test:audit": "playwright test e2e/auditoria-rutas.spec.ts",
+    "test:audit:strict": "cross-env AUDIT_STRICT=1 playwright test e2e/auditoria-rutas.spec.ts",
+    "typecheck": "pnpm --filter @erp/contracts build && pnpm --filter @erp/server exec tsc --noEmit && pnpm --filter @erp/client exec tsc --noEmit",
+    "audit:deps": "pnpm audit --prod",
+    "audit:static": "pnpm typecheck && pnpm audit:deps",
+    "audit:full": "pnpm audit:static && pnpm test:audit"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.64.0",
+    "cross-env": "^10.1.0",
     "typescript": "^5.5.4"
   }
 }
