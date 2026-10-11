@@ -219,7 +219,7 @@ export const RutaDetalleForm = ({ idRuta, parada, onSuccess, onCancel }: RutaDet
         onCancel={onCancel}
         isSubmitting={isSubmitting}
         isEditing={isEditing}
-        isFormValid={isFormValid}
+        isFormValid={isFormValid} blockers={validationErrors}
         createLabel="Agregar parada"
       />
     </form>
