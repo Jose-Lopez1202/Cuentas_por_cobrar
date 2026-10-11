@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Search } from 'lucide-react';
 import { DataTable, Select, StatusBadge } from '../../../shared/ui-kit';
+import { ExportMenu } from '../../../shared/components/ExportMenu';
+import type { ReportSpec } from '../../../shared/export/reportExport';
 import { apiClient, ApiError } from '../../../shared/api';
 import { formatDateGT } from '../../../shared/date';
 import type { CatalogoOption, EstadoCuenta } from '@erp/contracts';
@@ -33,11 +35,32 @@ export const EstadoCuentaPage = () => {
       .finally(() => setIsLoading(false));
   }, [idCliente]);
 
+  const getSpec = (): ReportSpec | null => {
+    if (!estadoCuenta) return null;
+    const e = estadoCuenta;
+    return {
+      filename: `estado-de-cuenta-${e.nombreCliente.replace(/[^A-Za-z0-9]+/g, '-').toLowerCase()}`,
+      title: 'Estado de Cuenta',
+      subtitle: `${e.nombreCliente}  |  NIT ${e.nitCliente ?? 'sin NIT'}`,
+      orientation: 'landscape',
+      summary: [['Total facturado', money(e.totalFacturado)], ['Saldo pendiente', money(e.totalSaldoPendiente)], ['Saldo vencido', money(e.totalVencido)]],
+      sections: [{
+        title: 'Documentos del cliente',
+        columns: [{ header: 'Documento' }, { header: 'Tipo' }, { header: 'Fecha' }, { header: 'Vencimiento' }, { header: 'Total', type: 'money' }, { header: 'Saldo', type: 'money' }, { header: 'Estado' }],
+        rows: e.documentos.map((d) => [d.referenciaDocumento, d.nombreTipoDocumento ?? '', formatDateGT(d.fechaDocumento), formatDateGT(d.fechaVencimiento), d.total, d.saldo, d.condicion === 'VENCIDA' ? `${d.estado} / VENCIDA` : d.estado]),
+        totals: ['TOTAL', '', '', '', e.totalFacturado, e.totalSaldoPendiente, ''],
+      }],
+    };
+  };
+
   return (
     <div className="space-y-6">
-      <div>
+      <div className="flex flex-wrap justify-between items-start gap-3">
+        <div>
         <h1 className="text-2xl font-bold text-slate-900">Estado de Cuenta</h1>
         <p className="text-sm text-slate-500">Historial completo de documentos de un cliente, con su saldo actual y condición de vencimiento.</p>
+        </div>
+        <ExportMenu getSpec={getSpec} disabledReason={!estadoCuenta ? 'Selecciona un cliente para poder exportar' : undefined} />
       </div>
 
       <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">

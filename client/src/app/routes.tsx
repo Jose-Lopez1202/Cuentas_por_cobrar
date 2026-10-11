@@ -13,6 +13,12 @@ import { TutorialsPage } from '../modules/cxc/tutoriales';
 import { ReportesLayout } from '../modules/cxc/reportes/ReportesLayout';
 import { AntiguedadSaldosPage } from '../modules/cxc/reportes/AntiguedadSaldosPage';
 import { EstadoCuentaPage } from '../modules/cxc/reportes/EstadoCuentaPage';
+import { LibroVentasPage } from '../modules/cxc/reportes/LibroVentasPage';
+import { EstadisticaVentasPage } from '../modules/cxc/reportes/EstadisticaVentasPage';
+import { EstadisticaCobranzaPage } from '../modules/cxc/reportes/EstadisticaCobranzaPage';
+
+// --- CXC / Facturación ---
+import { FacturasPage } from '../modules/cxc/facturacion/FacturasPage';
 
 // --- CXC / Organización ---
 import { OrganizacionLayout } from '../modules/cxc/organizacion/organizacionLayout';
@@ -76,6 +82,18 @@ export const routes: RouteObject[] = [
     ),
   },
 
+  // --- CXC / Facturación ---
+  {
+    path: '/cxc/facturacion/facturas',
+    element: (
+      <MainLayout>
+        <CxcAppLayout>
+          <FacturasPage />
+        </CxcAppLayout>
+      </MainLayout>
+    ),
+  },
+
   // --- CXC / Reportes ---
   {
     path: '/cxc/reportes/antiguedad-saldos',
@@ -83,6 +101,36 @@ export const routes: RouteObject[] = [
       <MainLayout>
         <ReportesLayout>
           <AntiguedadSaldosPage />
+        </ReportesLayout>
+      </MainLayout>
+    ),
+  },
+  {
+    path: '/cxc/reportes/libro-ventas',
+    element: (
+      <MainLayout>
+        <ReportesLayout>
+          <LibroVentasPage />
+        </ReportesLayout>
+      </MainLayout>
+    ),
+  },
+  {
+    path: '/cxc/reportes/estadistica-ventas',
+    element: (
+      <MainLayout>
+        <ReportesLayout>
+          <EstadisticaVentasPage />
+        </ReportesLayout>
+      </MainLayout>
+    ),
+  },
+  {
+    path: '/cxc/reportes/estadistica-cobranza',
+    element: (
+      <MainLayout>
+        <ReportesLayout>
+          <EstadisticaCobranzaPage />
         </ReportesLayout>
       </MainLayout>
     ),

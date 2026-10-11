@@ -7,6 +7,7 @@ import dashboardRoutes from './dashboard.routes';
 import reportesRoutes from './reportes.routes';
 import pagosRoutes from './pagos';
 import documentosRoutes from './documentos';
+import facturacionRoutes from './facturacion';
 
 const router = Router();
 
@@ -35,5 +36,8 @@ router.use('/', creditoRoutes);
 
 // Rutas de Documentos
 router.use('/', documentosRoutes);
+
+// Facturación electrónica (FEL) simulada
+router.use('/', facturacionRoutes);
 
 export default router;

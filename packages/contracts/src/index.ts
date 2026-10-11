@@ -20,3 +20,5 @@ export { ESTADOS_RECIBO } from './modules/cxc/pagos/recibo';
 
 // Estados del módulo de Documentos
 export { ESTADOS_DOCUMENTO } from './modules/cxc/documentos/documento';
+// Constantes de facturación FEL usadas por el formulario del cliente
+export { IVA_GT, LIMITE_CONSUMIDOR_FINAL } from "./modules/cxc/facturacion/factura";
