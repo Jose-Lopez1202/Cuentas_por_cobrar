@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { nitSchema } from '../validation';
+import { nitSchema, soloLetrasSchema } from '../validation';
 
 export const ESTADOS_EMPRESA = ['A', 'I'] as const;
 
@@ -12,7 +12,7 @@ export const empresaSchema = z.object({
 export type Empresa = z.infer<typeof empresaSchema>;
 
 export const createEmpresaSchema = z.object({
-  nombre: z.string().trim().min(1, 'El nombre es obligatorio').max(150),
+  nombre: soloLetrasSchema('El nombre', 150),
   nit: nitSchema.nullable().optional(),
   estado: z.enum(ESTADOS_EMPRESA).default('A'),
 });

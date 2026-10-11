@@ -6,11 +6,13 @@ import {
   BUSINESS_DATE_MAX,
   BUSINESS_DATE_MIN,
   hasErrors,
+  sanitizeSoloLetras,
   validateIdentifier,
   validateMaxLength,
   validateRequired,
   validateRequiredDate,
   validateRequiredSelect,
+  validateSoloLetras,
   type ValidationErrors,
 } from '../../../../shared/validation';
 import type { CatalogoOption, Ruta } from '@erp/contracts';
@@ -51,6 +53,8 @@ export const RutaForm = ({ ruta, onSuccess, onCancel }: RutaFormProps) => {
     if (nameErr) next.nombre = nameErr;
     const nameMax = validateMaxLength(nombre, 'El nombre', 120);
     if (nameMax) next.nombre = nameMax;
+    const nameLetras = validateSoloLetras(nombre, 'El nombre');
+    if (nameLetras) next.nombre = nameLetras;
     const empErr = validateRequiredSelect(idEmpleado, 'un empleado responsable');
     if (empErr) next.idEmpleado = empErr;
     if (fecha) {
@@ -123,10 +127,10 @@ export const RutaForm = ({ ruta, onSuccess, onCancel }: RutaFormProps) => {
           required
           maxLength={120}
           value={nombre}
-          onChange={(e: any) => setNombre(e.target.value)}
+          onChange={(e: any) => setNombre(sanitizeSoloLetras(e.target.value))}
           error={errors.nombre ?? (nombre ? validationErrors.nombre : undefined)}
-          helperText="Nombre descriptivo de la ruta; máximo 150 caracteres."
-          placeholder="Ej. Ruta Zona 9 - Miércoles"
+          helperText="Solo letras y espacios, sin números ni signos; máximo 120 caracteres."
+          placeholder="Ej. Ruta Centro Miércoles"
         />
       </div>
 

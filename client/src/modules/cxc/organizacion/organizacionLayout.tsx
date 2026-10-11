@@ -1,7 +1,8 @@
+import type { ReactNode } from 'react';
 import { CxcAppLayout } from '../shared/CxcAppLayout';
 
 interface OrganizacionLayoutProps {
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 export const OrganizacionLayout = ({ children }: OrganizacionLayoutProps) => (

@@ -4,15 +4,34 @@ import { FormActionButtons } from '../../../../shared/components/FormActionButto
 import { apiClient, ApiError } from '../../../../shared/api';
 import {
   hasErrors,
+  sanitizeSoloLetras,
   validateMoney,
   validateRequiredNumber,
   validateRequiredSelect,
+  validateSoloLetras,
   type ValidationErrors,
 } from '../../../../shared/validation';
 import type { CatalogoOption, RutaDetalle } from '@erp/contracts';
 
 const ESTADOS_VISITA = ['PENDIENTE', 'VISITADO', 'NO_ENCONTRADO', 'REPROGRAMADO'] as const;
 const ESTADO_OPTIONS = ESTADOS_VISITA.map((e) => ({ value: e, label: e.replace(/_/g, ' ') }));
+
+// Horario permitido para las visitas (formato 24 horas).
+const HORA_MIN = '08:00';
+const HORA_MAX = '19:00';
+
+// Dirección: solo letras, números, espacios y guion (-).
+const DIRECCION_REGEX = /^[\p{L}\p{N}\s-]+$/u;
+const sanitizeDireccion = (value: string) => value.replace(/[^\p{L}\p{N}\s-]/gu, '');
+
+// Limpia datos viejos (guardados antes de estas reglas) al abrir Editar.
+// Lo que no cumple se deja vacío; al guardar, se limpia también en la base de datos.
+const horaInicial = (hora?: string | null) => {
+  const h = hora?.slice(0, 5) ?? '';
+  return h && h >= HORA_MIN && h <= HORA_MAX ? h : '';
+};
+const montoInicial = (monto?: number | null) =>
+  monto !== null && monto !== undefined && monto > 0 ? monto.toString() : '';
 
 interface RutaDetalleFormProps {
   idRuta: number;
@@ -26,11 +45,11 @@ export const RutaDetalleForm = ({ idRuta, parada, onSuccess, onCancel }: RutaDet
   const [clientes, setClientes] = useState<CatalogoOption[]>([]);
   const [idCliente, setIdCliente] = useState(parada?.idCliente?.toString() ?? '');
   const [ordenVisita, setOrdenVisita] = useState(parada?.ordenVisita?.toString() ?? '');
-  const [direccion, setDireccion] = useState(parada?.direccion ?? '');
-  const [montoPendiente, setMontoPendiente] = useState(parada?.montoPendiente?.toString() ?? '');
+  const [direccion, setDireccion] = useState(sanitizeDireccion(parada?.direccion ?? '').trim());
+  const [montoPendiente, setMontoPendiente] = useState(montoInicial(parada?.montoPendiente));
   const [estadoVisita, setEstadoVisita] = useState(parada?.estadoVisita ?? 'PENDIENTE');
-  const [horaVisita, setHoraVisita] = useState(parada?.horaVisita?.slice(0, 5) ?? '');
-  const [observaciones, setObservaciones] = useState(parada?.observaciones ?? '');
+  const [horaVisita, setHoraVisita] = useState(horaInicial(parada?.horaVisita));
+  const [observaciones, setObservaciones] = useState(sanitizeSoloLetras(parada?.observaciones ?? '').trim());
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -51,13 +70,23 @@ export const RutaDetalleForm = ({ idRuta, parada, onSuccess, onCancel }: RutaDet
 
     if (montoPendiente) {
       const montoErr = validateMoney(montoPendiente, 'El monto pendiente', { positive: true });
-      if (montoErr) next.montoPendiente = montoErr;
+      if (montoErr) next.montoPendiente = 'El monto pendiente debe ser mayor a 0; máximo 2 decimales.';
     }
 
+    if (horaVisita && (horaVisita < HORA_MIN || horaVisita > HORA_MAX)) {
+      next.horaVisita = `La hora de visita debe estar entre ${HORA_MIN} y ${HORA_MAX} (8:00 a. m. a 7:00 p. m.).`;
+    }
+
+    if (direccion.trim() && !DIRECCION_REGEX.test(direccion.trim())) {
+      next.direccion = 'La dirección solo admite letras, números, espacios y guion (-).';
+    }
     if (direccion.length > 200) next.direccion = 'La dirección no puede superar 200 caracteres.';
+
+    const obsLetras = validateSoloLetras(observaciones, 'Las observaciones');
+    if (obsLetras) next.observaciones = obsLetras;
     if (observaciones.length > 500) next.observaciones = 'Las observaciones no pueden superar 500 caracteres.';
     return next;
-  }, [idCliente, ordenVisita, montoPendiente, direccion, observaciones]);
+  }, [idCliente, ordenVisita, montoPendiente, horaVisita, direccion, observaciones]);
 
   const isFormValid = !hasErrors(validationErrors);
 
@@ -71,14 +100,17 @@ export const RutaDetalleForm = ({ idRuta, parada, onSuccess, onCancel }: RutaDet
 
     setErrors({});
     setIsSubmitting(true);
+    // Al editar, un campo borrado se manda como null para que se limpie en la base de datos;
+    // si se manda undefined, el servidor lo ignora y conserva el valor anterior.
+    const vacio = isEditing ? null : undefined;
     const payload = {
       idCliente: Number(idCliente),
-      ordenVisita: ordenVisita ? Number(ordenVisita) : undefined,
-      direccion: direccion.trim() || undefined,
-      montoPendiente: montoPendiente ? Number(montoPendiente) : undefined,
+      ordenVisita: ordenVisita ? Number(ordenVisita) : vacio,
+      direccion: direccion.trim() || vacio,
+      montoPendiente: montoPendiente ? Number(montoPendiente) : vacio,
       estadoVisita: estadoVisita || undefined,
-      horaVisita: horaVisita || undefined,
-      observaciones: observaciones.trim() || undefined,
+      horaVisita: horaVisita || vacio,
+      observaciones: observaciones.trim() || vacio,
     };
 
     try {
@@ -129,20 +161,22 @@ export const RutaDetalleForm = ({ idRuta, parada, onSuccess, onCancel }: RutaDet
         label="Dirección"
         maxLength={200}
         value={direccion}
-        onChange={(e: any) => setDireccion(e.target.value)}
-        error={errors.direccion}
-        helperText="Dirección de la visita; máximo 200 caracteres."
-        placeholder="Opcional"
+        onChange={(e: any) => setDireccion(sanitizeDireccion(e.target.value))}
+        error={errors.direccion ?? (direccion ? validationErrors.direccion : undefined)}
+        helperText="Letras, números, espacios y guion (-); máximo 200 caracteres."
+        placeholder="Ej. 5a Avenida 10-25 Zona 1"
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <TextInput
           label="Hora de visita"
           type="time"
+          min={HORA_MIN}
+          max={HORA_MAX}
           value={horaVisita}
           onChange={(e: any) => setHoraVisita(e.target.value)}
-          error={errors.horaVisita}
-          helperText="Usa el selector de hora; formato 24 horas."
+          error={errors.horaVisita ?? (horaVisita ? validationErrors.horaVisita : undefined)}
+          helperText="Entre 08:00 y 19:00 (8 a. m. a 7 p. m.); formato 24 horas."
         />
         <TextInput
           label="Monto pendiente"
@@ -154,7 +188,7 @@ export const RutaDetalleForm = ({ idRuta, parada, onSuccess, onCancel }: RutaDet
           value={montoPendiente}
           onChange={(e: any) => setMontoPendiente(e.target.value)}
           error={errors.montoPendiente ?? (montoPendiente ? validationErrors.montoPendiente : undefined)}
-          helperText="Monto de referencia mayor a 0; máximo 2 decimales."
+          helperText="Monto de referencia; mayor a 0, máximo 2 decimales."
         />
         <Select
           label="Estado de visita"
@@ -168,11 +202,11 @@ export const RutaDetalleForm = ({ idRuta, parada, onSuccess, onCancel }: RutaDet
       <TextArea
         label="Observaciones"
         maxLength={500}
-        helperText="Información útil para la visita o seguimiento; máximo 500 caracteres."
+        helperText="Solo letras y espacios; máximo 500 caracteres."
         value={observaciones}
-        onChange={(e: any) => setObservaciones(e.target.value)}
+        onChange={(e: any) => setObservaciones(sanitizeSoloLetras(e.target.value))}
         rows={3}
-        error={errors.observaciones}
+        error={errors.observaciones ?? (observaciones ? validationErrors.observaciones : undefined)}
       />
 
       {formError && (

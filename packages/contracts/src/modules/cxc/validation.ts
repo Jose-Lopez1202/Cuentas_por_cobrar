@@ -116,6 +116,15 @@ export const nitSchema = z
     'El NIT debe tener un formato válido, por ejemplo 1234567-8',
   );
 
+// Nombre que solo admite letras (con tildes y ñ) y espacios; sin números ni signos.
+export const soloLetrasSchema = (fieldLabel: string, max: number) =>
+  z
+    .string()
+    .trim()
+    .min(1, `${fieldLabel} es obligatorio`)
+    .max(max, `${fieldLabel} no puede superar ${max} caracteres`)
+    .regex(/^[\p{L}\s]+$/u, `${fieldLabel} solo admite letras y espacios, sin números ni signos`);
+
 export function optionalTrimmedText(fieldLabel: string, max: number) {
   return z
     .string()

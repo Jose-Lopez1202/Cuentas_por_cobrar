@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { soloLetrasSchema } from '../validation';
 
 export const ESTADOS_SUCURSAL = ['A', 'I'] as const;
 
@@ -14,7 +15,7 @@ export type Sucursal = z.infer<typeof sucursalSchema>;
 
 export const createSucursalSchema = z.object({
   idEmpresa: z.number().int().positive('Selecciona una empresa'),
-  nombre: z.string().min(1, 'El nombre es obligatorio').max(150),
+  nombre: soloLetrasSchema('El nombre', 150),
   direccion: z.string().max(200).optional(),
   estado: z.enum(ESTADOS_SUCURSAL).default('A'),
 });
