@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import { test, expect, type Page } from '@playwright/test';
+import { iniciarSesionReal, simularSesion, simularSinSesion } from './helpers/auth';
 
 /**
  * AUDITORÍA AUTOMÁTICA DE PANTALLAS
@@ -24,8 +25,11 @@ import { test, expect, type Page } from '@playwright/test';
 const STRICT = process.env.AUDIT_STRICT === '1';
 const REAL_API = process.env.E2E_REAL_API === '1';
 
+// Pantallas públicas (sin sesión): se auditan como visitante.
+const PUBLICAS = ['/login', '/recuperar-clave', '/restablecer-clave'];
+
 const routesSource = readFileSync(join(__dirname, '..', 'client', 'src', 'app', 'routes.tsx'), 'utf8');
-const RUTAS = [...new Set([...routesSource.matchAll(/path:\s*'([^']+)'/g)].map((m) => m[1]))]
+const RUTAS = [...new Set([...PUBLICAS, ...[...routesSource.matchAll(/path:\s*'([^']+)'/g)].map((m) => m[1])])]
   .filter((p) => p.startsWith('/'))
   .map((p) => p.replace(/:[A-Za-z]+/g, '1'));
 
@@ -34,9 +38,15 @@ const IGNORAR_CONSOLA = [/favicon/i, /tile\.openstreetmap\.org/i, /ERR_INTERNET_
 
 const listaVacia = { data: [], meta: { page: 1, limit: 10, total: 0, totalPages: 1 } };
 
-async function simularApi(page: Page) {
-  if (REAL_API) return;
+async function prepararSesion(page: Page, ruta: string) {
+  if (REAL_API) {
+    if (!PUBLICAS.includes(ruta)) await iniciarSesionReal(page);
+    return;
+  }
   await page.route('**/api/**', (route) => route.fulfill({ json: listaVacia }));
+  // Las públicas se auditan como visitante; el resto, con una sesión simulada.
+  if (PUBLICAS.includes(ruta)) await simularSinSesion(page);
+  else await simularSesion(page);
 }
 
 test.describe('Auditoría de pantallas', () => {
@@ -55,7 +65,7 @@ test.describe('Auditoría de pantallas', () => {
         if (!IGNORAR_CONSOLA.some((re) => re.test(texto))) erroresConsola.push(texto);
       });
 
-      await simularApi(page);
+      await prepararSesion(page, ruta);
       await page.goto(ruta, { waitUntil: 'domcontentloaded' });
       await page.waitForLoadState('networkidle').catch(() => undefined);
 

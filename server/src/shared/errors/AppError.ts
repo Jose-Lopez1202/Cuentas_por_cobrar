@@ -49,3 +49,21 @@ export class SatRechazoError extends AppError {
     );
   }
 }
+
+export class UnauthorizedError extends AppError {
+  constructor(message = 'Credenciales inválidas', code = 'UNAUTHORIZED') {
+    super(message, 401, code);
+  }
+}
+
+export class ForbiddenError extends AppError {
+  constructor(message = 'No tienes permiso para realizar esta acción', code = 'FORBIDDEN') {
+    super(message, 403, code);
+  }
+}
+
+export class TooManyRequestsError extends AppError {
+  constructor(message: string, public readonly retryAfterSeconds: number) {
+    super(message, 429, 'TOO_MANY_REQUESTS');
+  }
+}

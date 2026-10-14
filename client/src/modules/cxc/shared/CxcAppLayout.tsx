@@ -12,8 +12,10 @@ import {
   HelpCircle,
   Landmark,
   LayoutDashboard,
+  KeyRound,
   LogOut,
   Package,
+  ShieldCheck,
   ReceiptText,
   ShoppingCart,
   UsersRound,
@@ -28,6 +30,8 @@ import {
   TUTORIALS,
   type Tutorial,
 } from '../tutoriales';
+import { useAuth } from '../../../shared/auth/AuthContext';
+import { ROL_LABEL } from '@erp/contracts';
 
 type CxcMenuItem = {
   id: string;
@@ -138,6 +142,7 @@ const CXC_GROUPS: CxcMenuGroup[] = [
 
 const CXC_DASHBOARD_PATH = '/cxc/dashboard';
 const CXC_TUTORIALS_PATH = '/cxc/tutoriales';
+const ADMIN_USUARIOS_PATH = '/admin/usuarios';
 
 const MAIN_MODULES = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -155,16 +160,19 @@ interface CxcAppLayoutProps {
 export const CxcAppLayout = ({ children }: CxcAppLayoutProps) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { usuario, logout } = useAuth();
+  const iniciales = (usuario?.nombre ?? 'U').split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join('') || 'U';
 
   const isDashboardActive = location.pathname === CXC_DASHBOARD_PATH;
   const isTutorialsActive = location.pathname === CXC_TUTORIALS_PATH;
+  const isAdminActive = location.pathname.startsWith('/admin');
 
   const activeGroup = useMemo(
     () =>
-      isDashboardActive || isTutorialsActive
+      isDashboardActive || isTutorialsActive || isAdminActive
         ? undefined
         : CXC_GROUPS.find((group) => location.pathname.startsWith(group.matchPrefix)) ?? CXC_GROUPS[0],
-    [location.pathname, isDashboardActive, isTutorialsActive],
+    [location.pathname, isDashboardActive, isTutorialsActive, isAdminActive],
   );
 
   const pageTutorial = useMemo(() => getTutorialForPath(location.pathname), [location.pathname]);
@@ -350,18 +358,42 @@ export const CxcAppLayout = ({ children }: CxcAppLayoutProps) => {
               </div>
             );
           })}
+
+          {usuario?.rol === 'ADMIN' && (
+            <div className="pt-3 mt-3 border-t border-slate-800/80">
+              <p className="px-3.5 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Administración</p>
+              <button
+                type="button"
+                onClick={() => navigate(ADMIN_USUARIOS_PATH)}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                  isAdminActive ? 'bg-slate-800 text-white border border-slate-700/50' : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/50'
+                }`}
+                aria-current={isAdminActive ? 'page' : undefined}
+              >
+                <ShieldCheck size={18} className={isAdminActive ? 'text-violet-400' : 'text-slate-400'} aria-hidden="true" />
+                <span className="truncate flex-1 text-left">Usuarios y accesos</span>
+              </button>
+            </div>
+          )}
         </nav>
 
         <div className="mt-auto p-4 border-t border-slate-800 bg-slate-900/90">
           <div className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-800/70 border border-slate-700/50">
-            <div className="w-9 h-9 rounded-full bg-slate-700 text-slate-200 font-semibold flex items-center justify-center text-xs border border-slate-600 shrink-0" aria-hidden="true">
-              ER
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-semibold flex items-center justify-center text-xs shrink-0" aria-hidden="true">
+              {iniciales}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-white truncate leading-tight">Eduardo Ruiz</p>
-              <p className="text-[11px] text-slate-400 truncate leading-tight mt-0.5">Director de Compras</p>
+              <p className="text-xs font-semibold text-white truncate leading-tight">{usuario?.nombre ?? 'Usuario'}</p>
+              <p className="text-[11px] text-slate-400 truncate leading-tight mt-0.5">{usuario ? ROL_LABEL[usuario.rol] : ''}</p>
             </div>
-            <LogOut size={16} className="text-slate-500" aria-hidden="true" />
+            <button type="button" onClick={() => navigate('/cambiar-clave')} title="Cambiar contraseña" aria-label="Cambiar contraseña"
+              className="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-700/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+              <KeyRound size={16} aria-hidden="true" />
+            </button>
+            <button type="button" onClick={() => logout()} title="Cerrar sesión" aria-label="Cerrar sesión"
+              className="p-1.5 rounded-md text-slate-400 hover:text-red-300 hover:bg-slate-700/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+              <LogOut size={16} aria-hidden="true" />
+            </button>
           </div>
         </div>
       </aside>
@@ -369,9 +401,9 @@ export const CxcAppLayout = ({ children }: CxcAppLayoutProps) => {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <header className="h-16 shrink-0 bg-white border-b border-slate-200 px-6 flex items-center justify-between gap-4" aria-label="Contexto de navegación">
           <div className="min-w-0">
-            <p className="text-[11px] uppercase tracking-wider font-semibold text-slate-400">Cuentas por Cobrar</p>
+            <p className="text-[11px] uppercase tracking-wider font-semibold text-slate-400">{isAdminActive ? 'Sistema' : 'Cuentas por Cobrar'}</p>
             <h2 className="text-sm font-semibold text-slate-800 truncate">
-              {isDashboardActive ? 'Dashboard' : isTutorialsActive ? 'Tutoriales' : activeGroup?.label}
+              {isAdminActive ? 'Administración' : isDashboardActive ? 'Dashboard' : isTutorialsActive ? 'Tutoriales' : activeGroup?.label}
             </h2>
           </div>
           {pageTutorial && (

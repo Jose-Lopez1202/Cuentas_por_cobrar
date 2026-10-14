@@ -25,3 +25,17 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #94A3B8;
 }
+
+/* ---------- Pantalla de acceso (login) ---------- */
+.auth-pattern {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+@keyframes auth-shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 50% { transform: translateX(4px); } 75% { transform: translateX(-2px); } }
+.auth-shake { animation: auth-shake 0.35s ease-in-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-shake { animation: none; }
+}

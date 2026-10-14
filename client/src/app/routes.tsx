@@ -49,6 +49,10 @@ import { AnticiposPage } from '../modules/cxc/pagos/AnticiposPage';
 import { AplicacionesAnticipoPage } from '../modules/cxc/pagos/AplicacionesAnticipoPage';
 import { RecibosPage } from '../modules/cxc/pagos/RecibosPage';
 import { FormasPagoPage } from '../modules/cxc/pagos/FormasPagoPage';
+// --- Administración ---
+import { UsuariosPage } from '../modules/admin/UsuariosPage';
+import { RequireRol } from '../modules/auth/ProtectedRoute';
+
 // --- CXC / Documentos ---
 import { DocumentosLayout } from '../modules/cxc/documentos/documentosLayout';
 import { DocumentosPage } from '../modules/cxc/documentos/DocumentosPage';
@@ -58,6 +62,20 @@ import { AjustesPage } from '../modules/cxc/documentos/AjustesPage';
 
 
 export const routes: RouteObject[] = [
+  // --- Administración (solo ADMIN) ---
+  {
+    path: '/admin/usuarios',
+    element: (
+      <MainLayout>
+        <CxcAppLayout>
+          <RequireRol roles={['ADMIN']}>
+            <UsuariosPage />
+          </RequireRol>
+        </CxcAppLayout>
+      </MainLayout>
+    ),
+  },
+
   // --- CXC / Dashboard ---
   {
     path: '/cxc/dashboard',
