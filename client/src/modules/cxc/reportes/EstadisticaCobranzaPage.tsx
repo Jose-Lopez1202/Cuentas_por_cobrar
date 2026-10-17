@@ -1,44 +1,28 @@
-import { useEffect, useState } from 'react';
-import { CalendarClock, Gauge, TriangleAlert, Wallet } from 'lucide-react';
-import { DataTable, StatusBadge } from '../../../shared/ui-kit';
+import type { EstadisticaCobranza } from '@erp/contracts';
 import { ExportMenu } from '../../../shared/components/ExportMenu';
 import type { ReportSpec } from '../../../shared/export/reportExport';
-import { DonutChart, HorizontalBarList, KpiTile, TrendLineChart } from '../../../shared/charts';
-import { apiClient, ApiError } from '../../../shared/api';
-import { moneyGT } from '../../../shared/csv';
-import type { EstadisticaCobranza } from '@erp/contracts';
-import { RangoFechas, rangoInicial, validarRango } from './components/RangoFechas';
-
-const COLOR_PROMESA: Record<string, string> = { CUMPLIDA: '#1baf7a', PENDIENTE: '#eb6834', INCUMPLIDA: '#c0392b' };
-const PALETA = ['#2a78d6', '#eb6834', '#1baf7a', '#4a3aa7', '#008300', '#c2410c'];
-const card = 'bg-white rounded-xl border border-slate-200 shadow-sm p-5';
-const pct = (n: number) => `${n.toLocaleString('es-GT', { maximumFractionDigits: 1 })} %`;
+import { useApi } from '../analisis/useApi';
+import { useFiltros } from '../analisis/useFiltros';
+import { COLOR, Q, Qc, entero, pct } from '../analisis/format';
+import { FilterBar } from '../analisis/ui/FilterBar';
+import { Encabezado, ErrorCaja, Esqueleto, Panel } from '../analisis/ui/Panel';
+import { KpiCard } from '../analisis/ui/KpiCard';
+import { RankBars, TendenciaChart } from '../analisis/ui/charts';
+import { DataGrid } from '../analisis/ui/DataGrid';
+import { EstadoPill, etiquetaEstado } from '../analisis/ui/Pills';
+import { useDetalle } from '../analisis/detalle/DetalleHost';
 
 export const EstadisticaCobranzaPage = () => {
-  const [rango, setRango] = useState(rangoInicial());
-  const [data, setData] = useState<EstadisticaCobranza | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const errores = validarRango(rango.desde, rango.hasta);
-  const valido = !errores.desde && !errores.hasta;
-
-  useEffect(() => {
-    if (!valido) return;
-    setIsLoading(true); setError(null);
-    apiClient.get<EstadisticaCobranza>(`/cxc/reportes/estadistica-cobranza?desde=${rango.desde}&hasta=${rango.hasta}`)
-      .then(setData)
-      .catch((err) => { setData(null); setError(err instanceof ApiError ? err.message : 'No se pudo cargar la estadística'); })
-      .finally(() => setIsLoading(false));
-  }, [rango.desde, rango.hasta, valido]);
+  const { filtros, query, cambiar, limpiar, hayFiltrosExtra } = useFiltros('90d');
+  const { data, loading, error, reload } = useApi<EstadisticaCobranza>('/cxc/reportes/estadistica-cobranza', { desde: query.desde, hasta: query.hasta });
+  const { abrir, host } = useDetalle(query);
 
   const getSpec = (): ReportSpec | null => {
     if (!data) return null;
     const t = data.totales;
     return {
-      filename: `estadistica-cobranza-${data.desde}_${data.hasta}`,
-      title: 'Estadistica de Cobranza',
-      subtitle: `Periodo ${data.desde} a ${data.hasta}`,
-      summary: [['Indice de cobranza', pct(t.indiceCobranza)], ['Facturado', moneyGT(t.facturado)], ['Cobrado', moneyGT(t.cobrado)], ['Cartera total', moneyGT(t.carteraTotal)], ['Cartera vencida', `${moneyGT(t.carteraVencida)} (${pct(t.porcentajeVencida)})`], ['Dias de cartera', `${t.diasCartera} dias`]],
+      filename: `estadistica-cobranza-${data.desde}_${data.hasta}`, title: 'Estadistica de Cobranza', subtitle: `Periodo ${data.desde} a ${data.hasta}`,
+      summary: [['Indice de cobranza', pct(t.indiceCobranza)], ['Facturado', Q(t.facturado)], ['Cobrado', Q(t.cobrado)], ['Cartera total', Q(t.carteraTotal)], ['Cartera vencida', `${Q(t.carteraVencida)} (${pct(t.porcentajeVencida)})`], ['Dias de cartera', `${t.diasCartera} dias`]],
       sections: [
         { title: 'Facturado vs cobrado por mes', columns: [{ header: 'Periodo' }, { header: 'Facturado', type: 'money' }, { header: 'Cobrado', type: 'money' }, { header: 'Indice', type: 'percent' }], rows: data.porMes.map((m) => [m.periodo, m.facturado, m.cobrado, m.facturado > 0 ? Math.round((m.cobrado / m.facturado) * 1000) / 10 : 0]), totals: ['TOTAL', t.facturado, t.cobrado, t.indiceCobranza] },
         { title: 'Pagos por forma de pago', columns: [{ header: 'Forma de pago' }, { header: 'Pagos', type: 'int' }, { header: 'Monto', type: 'money' }], rows: data.porFormaPago.map((f) => [f.formaPago, f.pagos, f.monto]) },
@@ -49,74 +33,73 @@ export const EstadisticaCobranzaPage = () => {
     };
   };
 
+  const t = data?.totales;
+  const serie = data?.porMes.map((m) => ({ etiqueta: m.periodo, fecha: m.periodo, facturado: m.facturado, cobrado: m.cobrado })) ?? [];
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap justify-between items-end gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Estadística de Cobranza</h1>
-          <p className="text-sm text-slate-500">Qué tanto de lo facturado se está cobrando, el estado de la cartera y el resultado de la gestión de cobro.</p>
+    <div>
+      <FilterBar filtros={filtros} onChange={cambiar} onLimpiar={limpiar} mostrarLimpiar={hayFiltrosExtra} cobrador={false} ruta={false}
+        nota="La cartera es la de hoy; el resto corresponde al período" />
+      <Encabezado
+        titulo="Estadística de cobranza"
+        descripcion="Qué tanto de lo facturado se cobra, cómo está la cartera y qué resultado dan las gestiones. Clic en un mes para ver los pagos que lo componen."
+        acciones={<ExportMenu getSpec={getSpec} disabledReason={!data || data.porMes.length === 0 ? 'No hay datos en el período para exportar' : undefined} />}
+      />
+      {error && <ErrorCaja mensaje={error} onReintentar={reload} />}
+      {loading && !data && <div className="space-y-4"><Esqueleto alto="h-[110px]" /><Esqueleto alto="h-80" /></div>}
+
+      {data && t && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <KpiCard etiqueta="Índice de cobranza" valor={pct(t.indiceCobranza)} color={COLOR.aqua} nota={`${Qc(t.cobrado)} cobrados de ${Qc(t.facturado)} facturados`} />
+            <KpiCard etiqueta="Cobrado en el período" valor={Q(t.cobrado)} color={COLOR.azul} nota="Pagos aplicados confirmados" />
+            <KpiCard etiqueta="Cartera vencida" valor={pct(t.porcentajeVencida)} color={COLOR.critico} nota={`${Q(t.carteraVencida)} de ${Q(t.carteraTotal)}`} />
+            <KpiCard etiqueta="Días de cartera" valor={`${entero(t.diasCartera)} días`} color={COLOR.violeta} nota="Cartera ÷ venta diaria del período" />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <Panel className="xl:col-span-2" titulo="Facturado vs. cobrado por mes" subtitulo="Cuando la línea azul se acerca a la naranja, se está cobrando lo que se factura" cargando={loading}>
+              <TendenciaChart datos={serie} series={[{ clave: 'facturado', etiqueta: 'Facturado', color: COLOR.naranja }, { clave: 'cobrado', etiqueta: 'Cobrado', color: COLOR.azul, area: true }]} alto={260} />
+            </Panel>
+            <Panel titulo="Pagos por forma de pago" subtitulo="Dinero recibido en el período">
+              <RankBars items={data.porFormaPago.map((f) => ({ clave: f.formaPago, etiqueta: f.formaPago, valor: f.monto, secundario: `${f.pagos} pagos` }))} vacio="Sin pagos en el período." />
+            </Panel>
+          </div>
+
+          <Panel titulo="Mes por mes" subtitulo="Clic en una fila para ver los pagos aplicados de ese mes" cargando={loading}>
+            <DataGrid
+              filas={data.porMes} clave={(m) => m.periodo} porPagina={12} compacta vacio="Sin movimientos en el período."
+              onFila={(m) => abrir({ tipo: 'pagos', titulo: `Pagos aplicados en ${m.periodo}`, modo: 'periodo', valor: m.periodo })} etiquetaFila={(m) => `Ver pagos de ${m.periodo}`}
+              columnas={[
+                { id: 'p', encabezado: 'Período', valor: (m) => m.periodo, total: () => 'Total' },
+                { id: 'f', encabezado: 'Facturado', alinear: 'der', valor: (m) => m.facturado, render: (m) => Q(m.facturado), total: () => Q(t.facturado) },
+                { id: 'c', encabezado: 'Cobrado', alinear: 'der', valor: (m) => m.cobrado, render: (m) => <strong>{Q(m.cobrado)}</strong>, total: () => Q(t.cobrado) },
+                { id: 'i', encabezado: 'Índice', alinear: 'der', valor: (m) => (m.facturado > 0 ? m.cobrado / m.facturado : 0), render: (m) => (m.facturado > 0 ? pct((m.cobrado / m.facturado) * 100) : '—'), total: () => pct(t.indiceCobranza) },
+              ]} />
+          </Panel>
+
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <Panel titulo="Promesas de pago" subtitulo="Compromisos registrados en el período">
+              <DataGrid filas={data.promesas} clave={(p) => p.estado} compacta vacio="Sin promesas en el período." columnas={[
+                { id: 'e', encabezado: 'Estado', valor: (p) => p.estado, render: (p) => <EstadoPill estado={p.estado} /> },
+                { id: 'n', encabezado: 'Cantidad', alinear: 'der', valor: (p) => p.cantidad },
+                { id: 'm', encabezado: 'Monto', alinear: 'der', valor: (p) => p.monto, render: (p) => Q(p.monto) },
+              ]} />
+            </Panel>
+            <Panel titulo="Resultado de las gestiones" subtitulo="Qué pasó cuando se contactó al cliente">
+              <RankBars items={data.gestiones.map((g) => ({ clave: g.resultado, etiqueta: etiquetaEstado(g.resultado), valor: g.cantidad }))} formato={entero} color={COLOR.aqua} vacio="Sin gestiones en el período." />
+            </Panel>
+            <Panel titulo="Convenios de pago" subtitulo="Acuerdos firmados en el período">
+              <DataGrid filas={data.convenios} clave={(c) => c.estado} compacta vacio="Sin convenios en el período." columnas={[
+                { id: 'e', encabezado: 'Estado', valor: (c) => c.estado, render: (c) => <EstadoPill estado={c.estado} /> },
+                { id: 'n', encabezado: 'Cantidad', alinear: 'der', valor: (c) => c.cantidad },
+                { id: 'm', encabezado: 'Deuda', alinear: 'der', valor: (c) => c.monto, render: (c) => Q(c.monto) },
+              ]} />
+            </Panel>
+          </div>
         </div>
-        <ExportMenu getSpec={getSpec} disabledReason={!data || data.porMes.length === 0 ? 'No hay datos en el periodo para exportar' : undefined} />
-      </div>
-
-      <RangoFechas {...rango} onChange={setRango} />
-      {error && <p role="alert" className="text-sm text-red-600 font-medium bg-red-50 border border-red-200 rounded-lg px-4 py-3">{error}</p>}
-      {isLoading && valido && <p className="text-sm text-slate-500">Cargando estadística…</p>}
-
-      {data && valido && (
-        <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <KpiTile label="Índice de cobranza" value={pct(data.totales.indiceCobranza)} icon={Gauge} color="#1baf7a" caption={`${moneyGT(data.totales.cobrado)} de ${moneyGT(data.totales.facturado)}`} />
-            <KpiTile label="Cobrado en el período" value={moneyGT(data.totales.cobrado)} icon={Wallet} color="#2a78d6" caption="Pagos aplicados confirmados" />
-            <KpiTile label="Cartera vencida" value={pct(data.totales.porcentajeVencida)} icon={TriangleAlert} color="#c0392b" caption={`${moneyGT(data.totales.carteraVencida)} de ${moneyGT(data.totales.carteraTotal)}`} />
-            <KpiTile label="Días de cartera" value={`${data.totales.diasCartera} días`} icon={CalendarClock} color="#4a3aa7" caption="Cartera ÷ venta diaria del período" />
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <section className={card}>
-              <h2 className="font-bold text-slate-900 mb-3">Cobrado por mes</h2>
-              <TrendLineChart data={data.porMes.map((m) => ({ label: m.periodo, value: m.cobrado }))} valueFormatter={moneyGT} color="#1baf7a" />
-            </section>
-            <section className={card}>
-              <h2 className="font-bold text-slate-900 mb-3">Promesas de pago</h2>
-              <DonutChart items={data.promesas.map((p) => ({ key: p.estado, label: p.estado, value: p.cantidad, color: COLOR_PROMESA[p.estado] ?? '#64748b' }))}
-                centerCaption="Promesas" emptyText="Sin promesas en el período" />
-            </section>
-          </div>
-
-          <section className={card}>
-            <h2 className="font-bold text-slate-900 mb-3">Facturado vs. cobrado por mes</h2>
-            <DataTable data={data.porMes} emptyText="Sin movimientos en el período" columns={[
-              { header: 'Período', accessorKey: 'periodo' },
-              { header: 'Facturado', accessorKey: 'facturado', align: 'right', cell: ({ value }: any) => moneyGT(value) },
-              { header: 'Cobrado', accessorKey: 'cobrado', align: 'right', cell: ({ value }: any) => moneyGT(value) },
-              { header: 'Índice', align: 'right', cell: ({ row }: any) => (row.facturado > 0 ? pct((row.cobrado / row.facturado) * 100) : '—') },
-            ]} />
-          </section>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <section className={card}>
-              <h2 className="font-bold text-slate-900 mb-3">Pagos por forma de pago</h2>
-              <HorizontalBarList items={data.porFormaPago.map((f, i) => ({ key: f.formaPago, label: f.formaPago, value: f.monto, secondaryValue: f.pagos, color: PALETA[i % PALETA.length] }))}
-                valueFormatter={moneyGT} secondaryFormatter={(n) => `${n} pagos`} emptyText="Sin pagos en el período" />
-            </section>
-            <section className={card}>
-              <h2 className="font-bold text-slate-900 mb-3">Resultado de las gestiones de cobro</h2>
-              <HorizontalBarList items={data.gestiones.map((g, i) => ({ key: g.resultado, label: g.resultado, value: g.cantidad, color: PALETA[i % PALETA.length] }))}
-                emptyText="Sin gestiones en el período" />
-            </section>
-          </div>
-
-          <section className={card}>
-            <h2 className="font-bold text-slate-900 mb-3">Convenios de pago</h2>
-            <DataTable data={data.convenios} emptyText="Sin convenios en el período" columns={[
-              { header: 'Estado', cell: ({ row }: any) => <StatusBadge status={row.estado} /> },
-              { header: 'Cantidad', accessorKey: 'cantidad', align: 'right' },
-              { header: 'Deuda convenida', accessorKey: 'monto', align: 'right', cell: ({ value }: any) => moneyGT(value) },
-            ]} />
-          </section>
-        </>
       )}
+      {host}
     </div>
   );
 };

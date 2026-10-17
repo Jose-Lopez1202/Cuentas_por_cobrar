@@ -53,4 +53,4 @@ Playwright no "lee" el código: ejecuta la aplicación como un usuario. La revis
 
 ## Escribir una prueba nueva
 
-Copia `e2e/condiciones-credito.spec.ts` como base. Convención: un archivo por pantalla o flujo, la API simulada con `page.route('**/api/cxc/**', ...)`.
+Copia `e2e/condiciones-credito.spec.ts` como base. Convención: un archivo por pantalla o flujo, la API simulada con `page.route('**/localhost:3000/api/cxc/**', ...)`.

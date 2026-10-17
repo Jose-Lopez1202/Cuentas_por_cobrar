@@ -111,7 +111,6 @@ export default function LoginPage() {
           label="Usuario" id="login-username" name="username" autoComplete="username" autoCapitalize="none" spellCheck={false} maxLength={50}
           inputRef={userRef} value={username} error={errores.username}
           onChange={(v) => { setUsername(v); if (errores.username) setErrores((x) => ({ ...x, username: undefined })); }}
-          onBlur={() => !username.trim() && setErrores((x) => ({ ...x, username: 'Ingresa tu usuario.' }))}
         />
 
         <div>

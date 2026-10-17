@@ -4,7 +4,7 @@ import { simularSesion } from './helpers/auth';
 const lista = { data: [], meta: { page: 1, limit: 10, total: 0, totalPages: 1 } };
 
 test.beforeEach(async ({ page }) => {
-  await page.route('**/api/cxc/**', (route) =>
+  await page.route('**/localhost:3000/api/cxc/**', (route) =>
     route.fulfill({ json: lista }),
   );
   await simularSesion(page);

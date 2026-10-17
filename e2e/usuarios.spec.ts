@@ -9,7 +9,7 @@ const usuario = {
 const lista = { data: [usuario], meta: { page: 1, limit: 10, total: 1, totalPages: 1 } };
 
 async function prepararApi(page: Page, rol: 'ADMIN' | 'OPERADOR' = 'ADMIN') {
-  await page.route('**/api/**', (route) => route.fulfill({ json: lista }));
+  await page.route('**/localhost:3000/api/**', (route) => route.fulfill({ json: lista }));
   await simularSesion(page, { rol });
 }
 
@@ -36,14 +36,14 @@ test.describe('Gestión de usuarios', () => {
     await page.getByRole('button', { name: 'Nuevo usuario' }).click();
     await page.getByRole('textbox', { name: /^Usuario/ }).fill('ab');
     await page.getByRole('textbox', { name: /^Usuario/ }).blur();
-    await expect(page.getByText('El usuario debe tener al menos 3 caracteres')).toBeVisible();
+    await expect(page.getByText('El usuario debe tener al menos 3 caracteres').first()).toBeVisible();
     await expect(page.getByRole('button', { name: 'Crear usuario' })).toBeDisabled();
     await expect(page.getByText('No se puede guardar todavía porque:')).toBeVisible();
   });
 
   test('crear un usuario muestra la contraseña temporal una sola vez', async ({ page }) => {
     await prepararApi(page);
-    await page.route('**/api/admin/usuarios', (route) => {
+    await page.route('**/localhost:3000/api/admin/usuarios', (route) => {
       if (route.request().method() !== 'POST') return route.fulfill({ json: lista });
       return route.fulfill({ status: 201, json: { usuario, claveTemporal: 'Temp#Clave2026x' } });
     });
@@ -59,7 +59,7 @@ test.describe('Gestión de usuarios', () => {
 
   test('el servidor rechaza un usuario repetido y el error sale bajo el campo', async ({ page }) => {
     await prepararApi(page);
-    await page.route('**/api/admin/usuarios', (route) => {
+    await page.route('**/localhost:3000/api/admin/usuarios', (route) => {
       if (route.request().method() !== 'POST') return route.fulfill({ json: lista });
       return route.fulfill({
         status: 400,

@@ -1,393 +1,180 @@
-import { useEffect, useState, type ReactNode } from 'react';
-import {
-  AlertTriangle,
-  Coins,
-  CreditCard,
-  FileSpreadsheet,
-  FolderOpen,
-  ReceiptText,
-  UsersRound,
-  WalletCards,
-} from 'lucide-react';
-import type { DashboardResumen } from '@erp/contracts';
-import { apiClient, ApiError } from '../../../shared/api';
-import {
-  DonutChart,
-  HorizontalBarList,
-  KpiTile,
-  StackedBar,
-  TrendLineChart,
-  VerticalBarChart,
-  tint,
-  type ChartDatum,
-  type HorizontalBarItem,
-} from '../../../shared/charts';
-import { getStatusLabel, getStatusTone, TONE_HEX } from '../../../shared/components/UnifiedStatusBadge';
-
-const formatMoney = (value: number) =>
-  `Q ${value.toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-const formatCount = (value: number) => value.toLocaleString('es-GT');
-
-// Un color de acento fijo por módulo (paleta categórica del skill de dataviz,
-// en orden fijo). Nunca se reasigna ni se cicla: cada módulo es siempre el
-// mismo color en todo el dashboard.
-const MODULES = {
-  documentos: { color: '#2a78d6', icon: FileSpreadsheet, label: 'Documentos' },
-  cobranza: { color: '#eb6834', icon: ReceiptText, label: 'Cobranza' },
-  credito: { color: '#1baf7a', icon: CreditCard, label: 'Crédito' },
-  pagos: { color: '#4a3aa7', icon: WalletCards, label: 'Pagos' },
-  organizacion: { color: '#008300', icon: UsersRound, label: 'Organización' },
-} as const;
-
-// Identidad pura (no es un estado bueno/malo): paleta categórica fija, un
-// color por tipo, en el mismo orden siempre.
-const TIPO_GESTION_COLORS: Record<string, string> = {
-  LLAMADA: '#2a78d6',
-  VISITA: '#eb6834',
-  EMAIL: '#1baf7a',
-  WHATSAPP: '#eda100',
-  CARTA: '#e87ba4',
-  OTRO: '#4a3aa7',
-  SIN_TIPO: '#94a3b8',
-};
-
-function toStatusBars(
-  items: Array<{ estado: string; cantidad: number; monto: number }>,
-  monetary = true,
-): HorizontalBarItem[] {
-  return items.map((item) => ({
-    key: item.estado,
-    label: getStatusLabel(item.estado),
-    value: item.cantidad,
-    secondaryValue: monetary ? item.monto : undefined,
-    color: TONE_HEX[getStatusTone(item.estado)],
-  }));
-}
-
-function toTipoBars(items: Array<{ tipo: string; cantidad: number }>): HorizontalBarItem[] {
-  return items.map((item) => ({
-    key: item.tipo,
-    label: getStatusLabel(item.tipo),
-    value: item.cantidad,
-    color: TIPO_GESTION_COLORS[item.tipo] ?? '#94a3b8',
-  }));
-}
-
-// Rutas sí tienen estados con una connotación clara (planificada/en
-// proceso/completada/cancelada): usa la misma paleta de status que el resto
-// del dashboard en vez de la paleta categórica de identidad pura.
-function toRutaEstadoBars(items: Array<{ tipo: string; cantidad: number }>): HorizontalBarItem[] {
-  return items.map((item) => ({
-    key: item.tipo,
-    label: getStatusLabel(item.tipo),
-    value: item.cantidad,
-    color: TONE_HEX[getStatusTone(item.tipo)],
-  }));
-}
-
-/** Misma paleta de estado que las barras, para circulares y columnas. */
-function toStatusDatums(
-  items: Array<{ estado: string; cantidad: number; monto: number }>,
-  field: 'cantidad' | 'monto' = 'cantidad',
-): ChartDatum[] {
-  return items.map((item) => ({
-    key: item.estado,
-    label: getStatusLabel(item.estado),
-    value: item[field],
-    color: TONE_HEX[getStatusTone(item.estado)],
-  }));
-}
-
-const CARTERA_COLORS = { vigente: '#2a78d6', vencida: '#d03b3b' } as const;
-
-interface ModuleSectionProps {
-  module: keyof typeof MODULES;
-  description?: string;
-  children: ReactNode;
-}
-
-/** Encabezado de módulo: icono + color de acento fijo, agrupa una o varias tarjetas. */
-const ModuleSection = ({ module, description, children }: ModuleSectionProps) => {
-  const { color, icon: Icon, label } = MODULES[module];
-  return (
-    <section>
-      <div className="flex items-center gap-2.5 mb-3">
-        <div
-          className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-          style={{ backgroundColor: tint(color, 0.14), color }}
-        >
-          <Icon size={15} strokeWidth={2.5} />
-        </div>
-        <h2 className="text-sm font-bold text-slate-800 tracking-tight">{label}</h2>
-        {description && <span className="text-xs text-slate-400">— {description}</span>}
-      </div>
-      {children}
-    </section>
-  );
-};
-
-interface ChartCardProps {
-  title: string;
-  children: ReactNode;
-}
-
-const ChartCard = ({ title, children }: ChartCardProps) => (
-  <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200">
-    <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">{title}</h3>
-    {children}
-  </div>
-);
+import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { RefreshCw } from 'lucide-react';
+import type { ResumenEjecutivo } from '@erp/contracts';
+import { ExportMenu } from '../../../shared/components/ExportMenu';
+import type { ReportSpec } from '../../../shared/export/reportExport';
+import { useApi } from '../analisis/useApi';
+import { useFiltros } from '../analisis/useFiltros';
+import { COLOR, Q, Qc, RAMPA_AZUL, agruparSerie, entero, fechaCorta, pct } from '../analisis/format';
+import { FilterBar } from '../analisis/ui/FilterBar';
+import { Encabezado, ErrorCaja, Esqueleto, Panel, Vacio } from '../analisis/ui/Panel';
+import { KpiCard } from '../analisis/ui/KpiCard';
+import { ColumnasChart, RankBars, TendenciaChart } from '../analisis/ui/charts';
+import { DataGrid } from '../analisis/ui/DataGrid';
+import { AlertaItem, EstadoPill } from '../analisis/ui/Pills';
+import { useDetalle } from '../analisis/detalle/DetalleHost';
 
 export const DashboardPage = () => {
-  const [resumen, setResumen] = useState<DashboardResumen | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
+  const { filtros, query, cambiar, limpiar, hayFiltrosExtra } = useFiltros('90d');
+  const { data, loading, error, reload } = useApi<ResumenEjecutivo>('/cxc/analitica/resumen', query);
+  const { abrir, host } = useDetalle(query);
+  const rangoValido = filtros.desde <= filtros.hasta;
 
-  useEffect(() => {
-    const controller = new AbortController();
+  const serie = useMemo(() => (data ? agruparSerie(data.serie.map((p) => ({ ...p })), ['cobrado', 'facturado']) : []), [data]);
 
-    setIsLoading(true);
-    setError(null);
+  const getSpec = (): ReportSpec | null => {
+    if (!data) return null;
+    const k = data.kpis;
+    return {
+      filename: `panel-cobranza-${data.desde}_${data.hasta}`,
+      title: 'Panel de Cuentas por Cobrar',
+      subtitle: `Periodo ${data.desde} a ${data.hasta}`,
+      orientation: 'landscape',
+      summary: [
+        ['Cobrado', Q(k.cobrado.actual)], ['Facturado', Q(k.facturado.actual)],
+        ['Indice de cobranza', k.indiceCobranza ? pct(k.indiceCobranza.actual) : 'N/D'],
+        ['Cartera total', Q(data.cartera.total)], ['Cartera vencida', `${Q(data.cartera.vencida)} (${pct(data.cartera.porcentajeVencida)})`],
+        ['Dias de cartera', `${data.cartera.diasCartera} dias`],
+      ],
+      sections: [
+        { title: 'Antiguedad de saldos', columns: [{ header: 'Tramo' }, { header: 'Documentos', type: 'int' }, { header: 'Monto', type: 'money' }], rows: data.antiguedad.map((t) => [t.tramo, t.documentos, t.monto]) },
+        { title: 'Mayores deudores vencidos', columns: [{ header: 'Cliente' }, { header: 'NIT' }, { header: 'Dias de atraso', type: 'int' }, { header: 'Saldo vencido', type: 'money' }, { header: 'Saldo total', type: 'money' }], rows: data.topDeudores.map((d) => [d.nombre, d.nit ?? '', d.diasMaxMora, d.saldoVencido, d.saldoTotal]) },
+        { title: 'Cobro por forma de pago', columns: [{ header: 'Forma de pago' }, { header: 'Pagos', type: 'int' }, { header: 'Monto', type: 'money' }], rows: data.formasPago.map((f) => [f.formaPago, f.pagos, f.monto]) },
+        { title: 'Vencimientos proximos', columns: [{ header: 'Semana' }, { header: 'Desde' }, { header: 'Documentos', type: 'int' }, { header: 'Monto', type: 'money' }], rows: data.vencimientosProximos.map((v) => [v.semana, v.desde, v.documentos, v.monto]) },
+      ],
+    };
+  };
 
-    apiClient
-      .get<DashboardResumen>('/cxc/dashboard/resumen', { signal: controller.signal })
-      .then((data) => {
-        if (controller.signal.aborted) return;
-        setResumen(data);
-        setError(null);
-      })
-      .catch((err) => {
-        // Una petición cancelada (cleanup de React StrictMode o cambio de
-        // pantalla) ya no es la vigente: su fallo no debe mostrarse.
-        if (controller.signal.aborted) return;
-        setError(err instanceof ApiError ? err.message : 'No se pudo cargar el dashboard.');
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setIsLoading(false);
-      });
-
-    return () => controller.abort();
-  }, []);
+  const k = data?.kpis;
+  const tendCobrado = data?.serie.map((p) => p.cobrado);
+  const tendFacturado = data?.serie.map((p) => p.facturado);
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Dashboard de Cuentas por Cobrar</h1>
-        <p className="text-sm text-slate-500">
-          Resumen en vivo de cobranza, crédito, documentos, pagos y organización.
-        </p>
-      </div>
+    <div>
+      <FilterBar filtros={filtros} onChange={cambiar} onLimpiar={limpiar} mostrarLimpiar={hayFiltrosExtra}
+        nota="La cartera y la antigüedad muestran el saldo de hoy; el cobrador solo filtra el cobro y la gestión" />
 
-      {error && (
-        <p className="text-sm text-red-600 font-medium bg-red-50 border border-red-200 rounded-lg px-4 py-3">
-          {error}
-        </p>
-      )}
+      <Encabezado
+        titulo="Panel de Cuentas por Cobrar"
+        descripcion="Cómo va la cobranza, qué tan sana está la cartera y dónde hay que actuar hoy."
+        acciones={<>
+          <button type="button" onClick={reload} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-[13px] font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} aria-hidden="true" /> Actualizar
+          </button>
+          <ExportMenu getSpec={getSpec} disabledReason={!data ? 'Espera a que carguen los datos para exportar' : undefined} />
+        </>}
+      />
 
-      {isLoading && !resumen && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-pulse">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-[104px] bg-white rounded-xl border border-slate-200" />
-          ))}
+      {error && <ErrorCaja mensaje={error} onReintentar={reload} />}
+      {!rangoValido && <ErrorCaja mensaje="El rango de fechas no es válido: la fecha inicial es posterior a la final." />}
+
+      {loading && !data && rangoValido && (
+        <div className="space-y-4" aria-busy="true">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">{[0, 1, 2, 3, 4].map((i) => <Esqueleto key={i} alto="h-[118px]" />)}</div>
+          <Esqueleto alto="h-72" />
         </div>
       )}
 
-      {resumen && (
-        <>
-          {/* KPIs generales */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <KpiTile
-              label="Cartera total"
-              value={formatMoney(resumen.kpis.carteraTotal)}
-              icon={Coins}
-              color="#2a78d6"
-              caption="Saldo pendiente, sin anulados"
+      {data && k && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            <KpiCard etiqueta="Cobrado" valor={Q(k.cobrado.actual)} comparar={k.cobrado} tendencia={tendCobrado} color={COLOR.azul} />
+            <KpiCard etiqueta="Facturado" valor={Q(k.facturado.actual)} comparar={k.facturado} tendencia={tendFacturado} color={COLOR.naranja} />
+            <KpiCard
+              etiqueta="Índice de cobranza"
+              valor={k.indiceCobranza ? pct(k.indiceCobranza.actual) : '—'}
+              comparar={k.indiceCobranza ?? undefined}
+              nota={k.indiceCobranza ? undefined : 'No aplica por cobrador: la facturación no se asigna a una persona'}
+              color={COLOR.aqua}
             />
-            <KpiTile
-              label="Cartera vencida"
-              value={formatMoney(resumen.kpis.carteraVencida)}
-              icon={AlertTriangle}
-              color="#d03b3b"
-              caption="Documentos con fecha de vencimiento pasada"
+            <KpiCard
+              etiqueta="Cartera vencida" valor={Q(data.cartera.vencida)} color={COLOR.critico}
+              nota={`${pct(data.cartera.porcentajeVencida)} de ${Qc(data.cartera.total)} · ${entero(data.cartera.clientesVencidos)} clientes`}
+              onClick={() => navigate('/cxc/analisis/clientes-riesgo')}
             />
-            <KpiTile
-              label="% cartera vencida"
-              value={`${resumen.kpis.porcentajeVencida.toFixed(1)}%`}
-              icon={AlertTriangle}
-              color="#fab219"
-              caption="Sobre el total de la cartera"
-            />
-            <KpiTile
-              label="Documentos abiertos"
-              value={formatCount(resumen.kpis.documentosAbiertos)}
-              icon={FolderOpen}
-              color="#1baf7a"
-              caption="Pendientes, parciales o vencidos"
+            <KpiCard
+              etiqueta="Días de cartera" valor={`${entero(data.cartera.diasCartera)} días`} color={COLOR.violeta}
+              nota="Cartera ÷ venta diaria. Menos es mejor"
             />
           </div>
 
-          {/* Salud de la cartera */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <ChartCard title="Cartera: vigente vs. vencida">
-              <DonutChart
-                items={[
-                  {
-                    key: 'vigente',
-                    label: 'Vigente',
-                    value: Math.max(resumen.kpis.carteraTotal - resumen.kpis.carteraVencida, 0),
-                    color: CARTERA_COLORS.vigente,
-                  },
-                  { key: 'vencida', label: 'Vencida', value: resumen.kpis.carteraVencida, color: CARTERA_COLORS.vencida },
-                ]}
-                valueFormatter={formatMoney}
-                centerCaption="Cartera total"
-              />
-            </ChartCard>
-            <ChartCard title="Saldo de documentos por estado">
-              <VerticalBarChart items={toStatusDatums(resumen.documentos.porEstado, 'monto')} valueFormatter={formatMoney} />
-            </ChartCard>
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <Panel className="xl:col-span-2" titulo="Cobrado vs. facturado" cargando={loading}
+              subtitulo={`Pagos aplicados y documentos emitidos, ${serie.length > 62 ? 'agrupados' : 'por día'}`}>
+              {data.serie.every((p) => p.cobrado === 0 && p.facturado === 0)
+                ? <Vacio texto="No hay movimientos en este período" detalle="Prueba con un rango más amplio o quita el filtro de cobrador o ruta." />
+                : <TendenciaChart datos={serie} series={[
+                  { clave: 'facturado', etiqueta: 'Facturado', color: COLOR.naranja },
+                  { clave: 'cobrado', etiqueta: 'Cobrado', color: COLOR.azul, area: true },
+                ]} />}
+            </Panel>
+
+            <Panel titulo="Qué atender" subtitulo="Alertas calculadas con los datos de hoy" cuerpoClassName="space-y-2">
+              {data.alertas.length === 0
+                ? <Vacio texto="Sin alertas" detalle="No hay promesas vencidas ni cartera crítica. Buen momento para revisar el ranking de cobradores." />
+                : data.alertas.map((a) => <AlertaItem key={a.id} severidad={a.severidad} titulo={a.titulo} detalle={a.detalle} onClick={a.destino ? () => navigate(a.destino!) : undefined} />)}
+            </Panel>
           </div>
 
-          {/* Documentos */}
-          <ModuleSection module="documentos">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <ChartCard title="Documentos por estado — cantidad y saldo asociado">
-                <HorizontalBarList
-                  items={toStatusBars(resumen.documentos.porEstado)}
-                  valueFormatter={formatCount}
-                  secondaryFormatter={(v) => `Saldo: ${formatMoney(v)}`}
-                />
-              </ChartCard>
-              <ChartCard title="Distribución de documentos">
-                <DonutChart items={toStatusDatums(resumen.documentos.porEstado)} valueFormatter={formatCount} centerCaption="Documentos" />
-              </ChartCard>
-            </div>
-          </ModuleSection>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <Panel titulo="Antigüedad de la cartera" subtitulo="Saldo pendiente según los días que lleva vencido">
+              <ColumnasChart etiquetaValor="Saldo" alto={230}
+                datos={data.antiguedad.map((t, i) => ({ clave: t.tramo, etiqueta: ['Corriente', '1-30', '31-60', '61-90', '+90'][i] ?? t.tramo, valor: t.monto, extra: `${t.documentos} documento(s)`, color: RAMPA_AZUL[i] }))}
+                onSeleccionar={() => navigate('/cxc/reportes/antiguedad-saldos')} />
+              <p className="mt-2 text-[11.5px] text-slate-500">Haz clic en una columna para abrir el reporte completo.</p>
+            </Panel>
 
-          {/* Cobranza */}
-          <ModuleSection module="cobranza">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <ChartCard title="Gestiones de cobro por tipo">
-                <DonutChart
-                  variant="pie"
-                  size={150}
-                  items={toTipoBars(resumen.cobranza.gestionesPorTipo)}
-                  valueFormatter={formatCount}
-                />
-              </ChartCard>
-              <ChartCard title="Promesas de pago por estado">
-                <VerticalBarChart items={toStatusDatums(resumen.cobranza.promesasPorEstado)} valueFormatter={formatCount} />
-              </ChartCard>
-              <ChartCard title="Convenios de pago por estado">
-                <HorizontalBarList
-                  items={toStatusBars(resumen.cobranza.conveniosPorEstado)}
-                  valueFormatter={formatCount}
-                  secondaryFormatter={(v) => `Deuda: ${formatMoney(v)}`}
-                />
-              </ChartCard>
-              <ChartCard title="Monto comprometido en promesas">
-                <DonutChart
-                  items={toStatusDatums(resumen.cobranza.promesasPorEstado, 'monto')}
-                  valueFormatter={formatMoney}
-                  centerCaption="Comprometido"
-                />
-              </ChartCard>
-              <div className="lg:col-span-2">
-                <ChartCard title="Deuda en convenios por estado">
-                  <StackedBar items={toStatusDatums(resumen.cobranza.conveniosPorEstado, 'monto')} valueFormatter={formatMoney} />
-                </ChartCard>
-              </div>
-            </div>
-          </ModuleSection>
+            <Panel titulo="Vencimientos próximos" subtitulo="Lo que vence en las siguientes 4 semanas">
+              {data.vencimientosProximos.length === 0
+                ? <Vacio texto="Nada vence en las próximas 4 semanas" />
+                : <ColumnasChart etiquetaValor="Por vencer" alto={230} color={COLOR.aqua}
+                  datos={data.vencimientosProximos.map((v) => ({ clave: v.desde, etiqueta: v.semana.replace('Próxima semana', 'Próxima').replace('Esta semana', 'Esta'), valor: v.monto, extra: `${v.documentos} documento(s) desde ${fechaCorta(v.desde, false)}` }))} />}
+            </Panel>
 
-          {/* Crédito */}
-          <ModuleSection module="credito">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <KpiTile
-                label="Documentos en mora activa"
-                value={formatCount(resumen.credito.moraActiva.cantidadDocumentos)}
-                icon={ReceiptText}
-                color="#1baf7a"
-              />
-              <KpiTile
-                label="Saldo vencido en mora"
-                value={formatMoney(resumen.credito.moraActiva.montoTotal)}
-                icon={ReceiptText}
-                color="#d03b3b"
-              />
-              <ChartCard title="Notas de crédito por estado">
-                <HorizontalBarList
-                  items={toStatusBars(resumen.credito.notasCreditoPorEstado)}
-                  valueFormatter={formatCount}
-                  secondaryFormatter={(v) => `Monto: ${formatMoney(v)}`}
-                />
-              </ChartCard>
-              <div className="lg:col-span-3">
-                <ChartCard title="Monto de notas de crédito por estado">
-                  <StackedBar
-                    items={toStatusDatums(resumen.credito.notasCreditoPorEstado, 'monto')}
-                    valueFormatter={formatMoney}
-                  />
-                </ChartCard>
-              </div>
-            </div>
-          </ModuleSection>
+            <Panel titulo="Cobro por forma de pago" subtitulo="Pagos aplicados en el período">
+              <RankBars items={data.formasPago.map((f) => ({ clave: f.formaPago, etiqueta: f.formaPago, valor: f.monto, secundario: `${f.pagos} pagos` }))} vacio="Sin pagos aplicados en el período." />
+            </Panel>
+          </div>
 
-          {/* Pagos */}
-          <ModuleSection module="pagos">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <ChartCard title="Pagos por estado (cantidad)">
-                <DonutChart items={toStatusDatums(resumen.pagos.porEstado)} valueFormatter={formatCount} centerCaption="Pagos" />
-              </ChartCard>
-              <ChartCard title="Pagos aplicados por mes">
-                <VerticalBarChart
-                  items={resumen.pagos.aplicadoPorMes.map((p) => ({
-                    key: p.mes,
-                    label: p.mes.slice(5),
-                    value: p.monto,
-                    color: MODULES.pagos.color,
-                  }))}
-                  valueFormatter={formatMoney}
-                />
-              </ChartCard>
-              <ChartCard title="Pagos por estado">
-                <HorizontalBarList
-                  items={toStatusBars(resumen.pagos.porEstado)}
-                  valueFormatter={formatCount}
-                  secondaryFormatter={(v) => `Monto: ${formatMoney(v)}`}
-                />
-              </ChartCard>
-              <ChartCard title="Pagos aplicados">
-                <TrendLineChart
-                  data={resumen.pagos.aplicadoPorMes.map((p) => ({ label: p.mes.slice(5), value: p.monto }))}
-                  valueFormatter={formatMoney}
-                  color={MODULES.pagos.color}
-                  headline={{
-                    title: formatMoney(resumen.pagos.aplicadoPorMes[resumen.pagos.aplicadoPorMes.length - 1]?.monto ?? 0),
-                    caption: 'Aplicado este mes',
-                  }}
-                />
-              </ChartCard>
-            </div>
-          </ModuleSection>
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <Panel className="xl:col-span-2" titulo="Mayores deudores vencidos" subtitulo="Haz clic en un cliente para ver su ficha completa: documentos, pagos, promesas y gestiones">
+              <DataGrid
+                filas={data.topDeudores} clave={(d) => d.idCliente} porPagina={6} compacta vacio="No hay clientes con saldo vencido."
+                onFila={(d) => abrir({ tipo: 'cliente', id: d.idCliente })} etiquetaFila={(d) => `Ver ficha de ${d.nombre}`}
+                columnas={[
+                  { id: 'n', encabezado: 'Cliente', valor: (d) => d.nombre, render: (d) => <span><span className="font-medium text-slate-900">{d.nombre}</span><span className="block text-[11.5px] text-slate-500">NIT {d.nit ?? '—'}</span></span> },
+                  { id: 'd', encabezado: 'Atraso', alinear: 'der', valor: (d) => d.diasMaxMora, render: (d) => `${d.diasMaxMora} d` },
+                  { id: 'v', encabezado: 'Vencido', alinear: 'der', valor: (d) => d.saldoVencido, render: (d) => <strong>{Q(d.saldoVencido)}</strong> },
+                  { id: 't', encabezado: 'Saldo total', alinear: 'der', valor: (d) => d.saldoTotal, render: (d) => Q(d.saldoTotal) },
+                ]} />
+            </Panel>
 
-          {/* Organización */}
-          <ModuleSection module="organizacion">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <ChartCard title="Rutas por estado">
-                <HorizontalBarList
-                  items={toRutaEstadoBars(resumen.organizacion.rutasPorEstado)}
-                  valueFormatter={formatCount}
-                />
-              </ChartCard>
-              <ChartCard title="Distribución de rutas">
-                <DonutChart items={toRutaEstadoBars(resumen.organizacion.rutasPorEstado)} valueFormatter={formatCount} centerCaption="Rutas" />
-              </ChartCard>
+            <div className="space-y-4">
+              <Panel titulo="Cobradores que más cobran" subtitulo="Clic para ver su desempeño"
+                acciones={<button type="button" onClick={() => navigate('/cxc/analisis/cobradores')} className="text-[12px] font-medium text-blue-800 hover:underline">Ver ranking</button>}>
+                <RankBars items={data.topCobradores.map((c) => ({ clave: c.idEmpleado, etiqueta: c.nombre, valor: c.cobrado }))}
+                  formato={Qc} onSeleccionar={(i) => abrir({ tipo: 'cobrador', id: Number(i.clave) })} vacio="Aún no hay cobros registrados por cobrador." />
+              </Panel>
+              <Panel titulo="Promesas de pago" subtitulo="Compromisos registrados en el período">
+                {data.promesas.length === 0 ? <Vacio texto="Sin promesas en el período" /> : (
+                  <ul className="divide-y divide-slate-100">
+                    {data.promesas.map((p) => (
+                      <li key={p.estado} className="flex items-center justify-between gap-3 py-2 text-[13px]">
+                        <EstadoPill estado={p.estado} />
+                        <span className="text-slate-500">{entero(p.cantidad)} promesa(s)</span>
+                        <strong className="tabular-nums text-slate-900">{Q(p.monto)}</strong>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Panel>
             </div>
-          </ModuleSection>
-        </>
+          </div>
+        </div>
       )}
+      {host}
     </div>
   );
 };
