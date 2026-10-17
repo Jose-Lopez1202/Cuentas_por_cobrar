@@ -11,10 +11,44 @@ export class ApiError extends Error {
     message: string,
     public status: number,
     public details?: unknown,
+    public code?: string,
+    /** Segundos de espera cuando el servidor limita los intentos (429). */
+    public retryAfter?: number,
   ) {
     super(message);
     this.name = 'ApiError';
   }
+}
+
+// --- Sesión ----------------------------------------------------------------------
+// El access token vive SOLO en memoria (nunca en localStorage): un script malicioso no
+// puede leerlo. La renovación usa una cookie httpOnly que JavaScript tampoco ve.
+let accessToken: string | null = null;
+export const getAccessToken = () => accessToken;
+export const setAccessToken = (token: string | null) => { accessToken = token; };
+
+/** Eventos de sesión: 'session-lost' (volver al login) y 'password-change-required'. */
+export const authEvents = new EventTarget();
+
+interface RefreshResult { accessToken: string; expiresIn: number; usuario: unknown }
+let refreshing: Promise<RefreshResult | null> | null = null;
+
+/** Renueva el access token. Una sola petición a la vez: varias pantallas pueden pedirlo juntas. */
+export function refreshAccessToken(): Promise<RefreshResult | null> {
+  refreshing ??= fetch(`${BASE_URL}/auth/refresh`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
+  })
+    .then(async (res) => {
+      if (!res.ok) return null;
+      const body = (await res.json()) as RefreshResult;
+      accessToken = body.accessToken;
+      return body;
+    })
+    .catch(() => null)
+    .finally(() => { refreshing = null; });
+  return refreshing;
 }
 
 /**
@@ -30,7 +64,7 @@ function defaultSuccessMessage(method: string, path: string): string {
   return 'Información guardada correctamente.';
 }
 
-async function request<T>(path: string, { successMessage, ...options }: ApiOptions = {}): Promise<T> {
+async function request<T>(path: string, { successMessage, ...options }: ApiOptions = {}, retried = false): Promise<T> {
   const notifySuccess = () => {
     const method = (options.method ?? 'GET').toUpperCase();
     if (method === 'GET' || successMessage === false) return;
@@ -49,10 +83,12 @@ async function request<T>(path: string, { successMessage, ...options }: ApiOptio
     const response = await fetch(`${BASE_URL}${path}`, {
       ...options,
       signal: controller.signal,
+      credentials: 'include',
       cache: options.method === 'GET' || !options.method ? 'no-store' : options.cache,
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         ...options.headers,
       },
     });
@@ -65,10 +101,27 @@ async function request<T>(path: string, { successMessage, ...options }: ApiOptio
     const body = await response.json().catch(() => null);
 
     if (!response.ok) {
+      const isAuthCall = path.startsWith('/auth/');
+      // Token vencido: se renueva una vez y se repite la petición sin que el usuario lo note.
+      if (response.status === 401 && !isAuthCall && !retried && (body?.code === 'TOKEN_EXPIRED' || body?.code === 'UNAUTHORIZED')) {
+        if (await refreshAccessToken()) {
+          window.clearTimeout(timeoutId);
+          return request<T>(path, { ...options, successMessage }, true);
+        }
+      }
+      if (response.status === 401 && !isAuthCall) {
+        accessToken = null;
+        authEvents.dispatchEvent(new Event('session-lost'));
+      }
+      if (response.status === 403 && body?.code === 'PASSWORD_CHANGE_REQUIRED') {
+        authEvents.dispatchEvent(new Event('password-change-required'));
+      }
       throw new ApiError(
         body?.error ?? `Error ${response.status}`,
         response.status,
         body?.details,
+        body?.code,
+        body?.retryAfter,
       );
     }
 

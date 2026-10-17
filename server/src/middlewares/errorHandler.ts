@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
-import { AppError } from '../shared/errors/AppError';
+import { AppError, TooManyRequestsError } from '../shared/errors/AppError';
 import { logger } from '../shared/logger';
 
 /**
@@ -26,10 +26,12 @@ export function errorHandler(
   }
 
   if (err instanceof AppError) {
+    if (err instanceof TooManyRequestsError) res.setHeader('Retry-After', String(err.retryAfterSeconds));
     res.status(err.statusCode).json({
       error: err.expose ? err.message : 'No fue posible completar la operación',
       code: err.code,
       ...(err.details ? { details: err.details } : {}),
+      ...(err instanceof TooManyRequestsError ? { retryAfter: err.retryAfterSeconds } : {}),
     });
     return;
   }

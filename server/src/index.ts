@@ -2,6 +2,9 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import cxcRoutes from './modules/cxc/routes';
+import authRoutes from './modules/auth/auth.routes';
+import usuariosRoutes from './modules/usuarios/usuarios.routes';
+import { blockIfPasswordChangeRequired, enforceReadOnlyRole, requireAuth } from './modules/auth/auth.middleware';
 import { errorHandler, noStore, requestLogger, securityHeaders } from './middlewares';
 import { initOraclePool, closeOraclePool } from './config/database';
 import { config } from './config';
@@ -22,6 +25,8 @@ app.use(cors({
     }
     callback(new Error('Origen no permitido por CORS'));
   },
+  // La cookie de renovación viaja solo a orígenes de la lista blanca.
+  credentials: true,
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
@@ -33,7 +38,12 @@ app.get('/health', (_req, res) => {
 });
 
 // Datos financieros: evitar caché de navegador/proxy en toda la API CxC.
-app.use('/api/cxc', noStore, cxcRoutes);
+// Login/renovación/cierre de sesión (públicas, con su propia protección).
+app.use('/api/auth', noStore, authRoutes);
+
+// Todo CxC exige sesión válida, clave ya cambiada y rol con permiso para la operación.
+app.use('/api/admin/usuarios', noStore, requireAuth, blockIfPasswordChangeRequired, usuariosRoutes);
+app.use('/api/cxc', noStore, requireAuth, blockIfPasswordChangeRequired, enforceReadOnlyRole, cxcRoutes);
 
 app.use(errorHandler);
 
