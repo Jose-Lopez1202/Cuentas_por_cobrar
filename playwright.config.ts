@@ -4,6 +4,8 @@ import { defineConfig, devices } from '@playwright/test';
 // que no necesitan Oracle ni el servidor Express: solo levantan el front.
 export default defineConfig({
   testDir: './e2e',
+  // El primer arranque de Vite en frío tarda; 60 s evita falsos fallos.
+  timeout: 60_000,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

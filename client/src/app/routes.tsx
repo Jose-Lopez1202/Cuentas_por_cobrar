@@ -49,6 +49,12 @@ import { AnticiposPage } from '../modules/cxc/pagos/AnticiposPage';
 import { AplicacionesAnticipoPage } from '../modules/cxc/pagos/AplicacionesAnticipoPage';
 import { RecibosPage } from '../modules/cxc/pagos/RecibosPage';
 import { FormasPagoPage } from '../modules/cxc/pagos/FormasPagoPage';
+// --- CXC / Análisis ---
+import { CobradoresPage } from '../modules/cxc/analisis/CobradoresPage';
+import { DiasCobroPage } from '../modules/cxc/analisis/DiasCobroPage';
+import { RutasAnalisisPage } from '../modules/cxc/analisis/RutasAnalisisPage';
+import { ClientesRiesgoPage } from '../modules/cxc/analisis/ClientesRiesgoPage';
+
 // --- Administración ---
 import { UsuariosPage } from '../modules/admin/UsuariosPage';
 import { RequireRol } from '../modules/auth/ProtectedRoute';
@@ -83,6 +89,48 @@ export const routes: RouteObject[] = [
       <MainLayout>
         <CxcAppLayout>
           <DashboardPage />
+        </CxcAppLayout>
+      </MainLayout>
+    ),
+  },
+
+  // --- CXC / Análisis ---
+  {
+    path: '/cxc/analisis/cobradores',
+    element: (
+      <MainLayout>
+        <CxcAppLayout>
+          <CobradoresPage />
+        </CxcAppLayout>
+      </MainLayout>
+    ),
+  },
+  {
+    path: '/cxc/analisis/dias-cobro',
+    element: (
+      <MainLayout>
+        <CxcAppLayout>
+          <DiasCobroPage />
+        </CxcAppLayout>
+      </MainLayout>
+    ),
+  },
+  {
+    path: '/cxc/analisis/rutas',
+    element: (
+      <MainLayout>
+        <CxcAppLayout>
+          <RutasAnalisisPage />
+        </CxcAppLayout>
+      </MainLayout>
+    ),
+  },
+  {
+    path: '/cxc/analisis/clientes-riesgo',
+    element: (
+      <MainLayout>
+        <CxcAppLayout>
+          <ClientesRiesgoPage />
         </CxcAppLayout>
       </MainLayout>
     ),

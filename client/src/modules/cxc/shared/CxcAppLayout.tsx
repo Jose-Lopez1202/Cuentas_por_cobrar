@@ -4,6 +4,7 @@ import {
   ChevronDown,
   ChevronRight,
   BarChart3,
+  LineChart,
   Coins,
   CreditCard,
   FileSpreadsheet,
@@ -57,6 +58,18 @@ type CxcMenuGroup = {
  * catálogo independiente.
  */
 const CXC_GROUPS: CxcMenuGroup[] = [
+  {
+    id: 'analisis',
+    label: 'Análisis',
+    icon: LineChart,
+    matchPrefix: '/cxc/analisis',
+    items: [
+      { id: 'cobradores', label: 'Ranking de Cobradores', path: '/cxc/analisis/cobradores' },
+      { id: 'dias-cobro', label: 'Mejores Días de Cobro', path: '/cxc/analisis/dias-cobro' },
+      { id: 'rutas-analisis', label: 'Rutas Recurrentes', path: '/cxc/analisis/rutas' },
+      { id: 'clientes-riesgo', label: 'Clientes Problemáticos', path: '/cxc/analisis/clientes-riesgo' },
+    ],
+  },
   {
     id: 'facturacion',
     label: 'Facturación',

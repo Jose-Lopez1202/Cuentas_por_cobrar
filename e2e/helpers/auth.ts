@@ -12,16 +12,23 @@ export const usuarioPrueba = {
  * Simula una sesión ya iniciada (la API de auth va simulada). Registrar DESPUÉS de
  * cualquier page.route genérico de la API: Playwright da prioridad a la última ruta.
  */
+/** Las fuentes de Google no se necesitan para probar y, sin internet, retrasan la carga de cada página. */
+export async function sinFuentesExternas(page: Page) {
+  await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) => route.abort());
+}
+
 export async function simularSesion(page: Page, usuario: Partial<typeof usuarioPrueba> = {}) {
-  await page.route('**/api/auth/refresh', (route) =>
+  await sinFuentesExternas(page);
+  await page.route('**/localhost:3000/api/auth/refresh', (route) =>
     route.fulfill({ json: { accessToken: 'token-de-prueba', expiresIn: 900, usuario: { ...usuarioPrueba, ...usuario } } }),
   );
-  await page.route('**/api/auth/logout', (route) => route.fulfill({ status: 204 }));
+  await page.route('**/localhost:3000/api/auth/logout', (route) => route.fulfill({ status: 204 }));
 }
 
 /** Visitante sin sesión: la renovación falla, así que las pantallas protegidas mandan al login. */
 export async function simularSinSesion(page: Page) {
-  await page.route('**/api/auth/refresh', (route) =>
+  await sinFuentesExternas(page);
+  await page.route('**/localhost:3000/api/auth/refresh', (route) =>
     route.fulfill({ status: 401, json: { error: 'Sin sesión', code: 'SESSION_INVALID' } }),
   );
 }
@@ -32,7 +39,7 @@ export async function iniciarSesionReal(page: Page) {
   const password = process.env.E2E_PASSWORD;
   if (!username || !password) throw new Error('Define E2E_USER y E2E_PASSWORD para auditar con la API real.');
   await page.goto('/login');
-  await page.getByLabel('Usuario').fill(username);
+  await page.getByLabel('Usuario', { exact: true }).fill(username);
   await page.getByLabel('Contraseña', { exact: true }).fill(password);
   await page.getByRole('button', { name: /Iniciar sesión/ }).click();
   await page.waitForURL((url) => !url.pathname.startsWith('/login'));

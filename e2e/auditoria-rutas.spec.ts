@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import { test, expect, type Page } from '@playwright/test';
 import { iniciarSesionReal, simularSesion, simularSinSesion } from './helpers/auth';
+import { simularAnalitica, simularReportesVacios } from './fixtures/analitica';
 
 /**
  * AUDITORÍA AUTOMÁTICA DE PANTALLAS
@@ -43,7 +44,9 @@ async function prepararSesion(page: Page, ruta: string) {
     if (!PUBLICAS.includes(ruta)) await iniciarSesionReal(page);
     return;
   }
-  await page.route('**/api/**', (route) => route.fulfill({ json: listaVacia }));
+  await page.route('**/localhost:3000/api/**', (route) => route.fulfill({ json: listaVacia }));
+  await simularAnalitica(page);
+  await simularReportesVacios(page);
   // Las públicas se auditan como visitante; el resto, con una sesión simulada.
   if (PUBLICAS.includes(ruta)) await simularSinSesion(page);
   else await simularSesion(page);
