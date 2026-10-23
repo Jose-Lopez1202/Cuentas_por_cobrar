@@ -1,95 +1,101 @@
-import { useEffect, useState } from 'react';
-import { DataTable } from '../../../shared/ui-kit';
+import { useMemo } from 'react';
+import type { AntiguedadSaldosReporte } from '@erp/contracts';
 import { ExportMenu } from '../../../shared/components/ExportMenu';
 import type { ReportSpec } from '../../../shared/export/reportExport';
-import { apiClient, ApiError } from '../../../shared/api';
-import type { AntiguedadSaldosReporte } from '@erp/contracts';
+import { useApi } from '../analisis/useApi';
+import { COLOR, Q, RAMPA_AZUL, pct } from '../analisis/format';
+import { Encabezado, ErrorCaja, Esqueleto, Panel } from '../analisis/ui/Panel';
+import { KpiCard } from '../analisis/ui/KpiCard';
+import { ColumnasChart, RankBars } from '../analisis/ui/charts';
+import { DataGrid } from '../analisis/ui/DataGrid';
+import { Medidor } from '../analisis/ui/Pills';
+import { useDetalle } from '../analisis/detalle/DetalleHost';
 
-const money = (value: unknown) =>
-  `Q ${Number(value ?? 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const hoyIso = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
 export const AntiguedadSaldosPage = () => {
-  const [reporte, setReporte] = useState<AntiguedadSaldosReporte | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: reporte, loading, error, reload } = useApi<AntiguedadSaldosReporte>('/cxc/reportes/antiguedad-saldos');
+  const hoy = useMemo(hoyIso, []);
+  const { abrir, host } = useDetalle({ desde: hoy, hasta: hoy });
+  const t = reporte?.totales;
+  const parte = (v: number) => (t && t.total > 0 ? (v / t.total) * 100 : 0);
 
-  useEffect(() => {
-    setIsLoading(true);
-    apiClient
-      .get<AntiguedadSaldosReporte>('/cxc/reportes/antiguedad-saldos')
-      .then(setReporte)
-      .catch((err) => setError(err instanceof ApiError ? err.message : 'No se pudo cargar el reporte'))
-      .finally(() => setIsLoading(false));
-  }, []);
-
-  const totales = reporte?.totales;
+  const tramos = t ? [
+    { id: 'corriente', etiqueta: 'Al corriente', valor: t.corriente },
+    { id: '1-30', etiqueta: '1 a 30 días', valor: t.dias1a30 },
+    { id: '31-60', etiqueta: '31 a 60 días', valor: t.dias31a60 },
+    { id: '61-90', etiqueta: '61 a 90 días', valor: t.dias61a90 },
+    { id: '90+', etiqueta: 'Más de 90 días', valor: t.mas90 },
+  ] : [];
 
   const getSpec = (): ReportSpec | null => {
-    if (!reporte) return null;
-    const t = reporte.totales;
-    const pct = (v: number) => (t.total > 0 ? Math.round((v / t.total) * 1000) / 10 : 0);
+    if (!reporte || !t) return null;
+    const p = (v: number) => (t.total > 0 ? Math.round((v / t.total) * 1000) / 10 : 0);
     return {
-      filename: 'antiguedad-de-saldos',
-      title: 'Antiguedad de Saldos',
-      subtitle: 'Saldo pendiente por cliente segun dias de vencimiento',
-      orientation: 'landscape',
-      summary: [['Corriente', money(t.corriente)], ['1-30 dias', money(t.dias1a30)], ['31-60 dias', money(t.dias31a60)], ['61-90 dias', money(t.dias61a90)], ['+90 dias', money(t.mas90)], ['Total cartera', money(t.total)]],
+      filename: 'antiguedad-de-saldos', title: 'Antiguedad de Saldos', subtitle: 'Saldo pendiente por cliente segun dias de vencimiento', orientation: 'landscape',
+      summary: [['Corriente', Q(t.corriente)], ['1-30 dias', Q(t.dias1a30)], ['31-60 dias', Q(t.dias31a60)], ['61-90 dias', Q(t.dias61a90)], ['+90 dias', Q(t.mas90)], ['Total cartera', Q(t.total)]],
       sections: [{
         title: 'Detalle por cliente',
         columns: [{ header: 'Cliente' }, { header: 'Corriente', type: 'money' }, { header: '1-30 dias', type: 'money' }, { header: '31-60 dias', type: 'money' }, { header: '61-90 dias', type: 'money' }, { header: '+90 dias', type: 'money' }, { header: 'Total', type: 'money' }, { header: '% cartera', type: 'percent' }],
-        rows: reporte.clientes.map((c) => [c.nombreCliente, c.corriente, c.dias1a30, c.dias31a60, c.dias61a90, c.mas90, c.total, pct(c.total)]),
+        rows: reporte.clientes.map((c) => [c.nombreCliente, c.corriente, c.dias1a30, c.dias31a60, c.dias61a90, c.mas90, c.total, p(c.total)]),
         totals: ['TOTAL', t.corriente, t.dias1a30, t.dias31a60, t.dias61a90, t.mas90, t.total, 100],
       }],
     };
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap justify-between items-end gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Antigüedad de Saldos</h1>
-          <p className="text-sm text-slate-500">
-            Saldo pendiente de cada cliente, agrupado por cuántos días lleva vencido. Solo incluye documentos con saldo, sin contar pagados ni anulados.
-          </p>
-        </div>
-        <ExportMenu getSpec={getSpec} disabledReason={!reporte || reporte.clientes.length === 0 ? 'No hay saldos pendientes para exportar' : undefined} />
-      </div>
+    <div>
+      <Encabezado
+        titulo="Antigüedad de saldos"
+        descripcion="Cuánto te debe cada cliente y hace cuántos días venció. Solo documentos con saldo; no incluye pagados ni anulados. Clic en un cliente para ver su ficha."
+        acciones={<ExportMenu getSpec={getSpec} disabledReason={!reporte || reporte.clientes.length === 0 ? 'No hay saldos pendientes para exportar' : undefined} />}
+      />
+      {error && <ErrorCaja mensaje={error} onReintentar={reload} />}
+      {loading && !reporte && <div className="space-y-4"><Esqueleto alto="h-[110px]" /><Esqueleto alto="h-80" /></div>}
 
-      {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">{error}</p>}
+      {reporte && t && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
+            <KpiCard etiqueta="Total cartera" valor={Q(t.total)} color={COLOR.tinta} nota={`${reporte.clientes.length} clientes con saldo`} />
+            {tramos.map((tr, i) => (
+              <KpiCard key={tr.id} etiqueta={tr.etiqueta} valor={Q(tr.valor)} color={RAMPA_AZUL[i]} nota={`${pct(parte(tr.valor))} de la cartera`} />
+            ))}
+          </div>
 
-      {totales && (
-        <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
-          {[
-            { label: 'Corriente', value: totales.corriente, tone: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
-            { label: '1-30 días', value: totales.dias1a30, tone: 'text-amber-700 bg-amber-50 border-amber-200' },
-            { label: '31-60 días', value: totales.dias31a60, tone: 'text-orange-700 bg-orange-50 border-orange-200' },
-            { label: '61-90 días', value: totales.dias61a90, tone: 'text-red-700 bg-red-50 border-red-200' },
-            { label: '+90 días', value: totales.mas90, tone: 'text-red-800 bg-red-100 border-red-300' },
-            { label: 'Total cartera', value: totales.total, tone: 'text-slate-900 bg-slate-100 border-slate-300' },
-          ].map((bucket) => (
-            <div key={bucket.label} className={`rounded-lg border px-3 py-2.5 ${bucket.tone}`}>
-              <p className="text-[11px] font-semibold uppercase tracking-wide opacity-80">{bucket.label}</p>
-              <p className="text-sm font-bold mt-0.5">{money(bucket.value)}</p>
-            </div>
-          ))}
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <Panel titulo="Distribución de la cartera" subtitulo="Saldo según los días vencidos" cargando={loading}>
+              <ColumnasChart etiquetaValor="Saldo" alto={240}
+                datos={tramos.map((tr, i) => ({ clave: tr.id, etiqueta: ['Corriente', '1-30', '31-60', '61-90', '+90'][i], valor: tr.valor, extra: pct(parte(tr.valor)), color: RAMPA_AZUL[i] }))} />
+            </Panel>
+            <Panel className="xl:col-span-2" titulo="Dónde se concentra la deuda" subtitulo="Los 6 clientes con más saldo. Clic para ver su ficha" cargando={loading}>
+              <RankBars
+                items={[...reporte.clientes].sort((a, b) => b.total - a.total).slice(0, 6).map((c) => ({ clave: c.idCliente, etiqueta: c.nombreCliente, valor: c.total, secundario: pct(parte(c.total), 0) }))}
+                onSeleccionar={(i) => abrir({ tipo: 'cliente', id: Number(i.clave) })} vacio="No hay saldos pendientes." />
+            </Panel>
+          </div>
+
+          <Panel titulo="Detalle por cliente" subtitulo="Ordena por cualquier columna; las más a la derecha son las más difíciles de cobrar" cargando={loading}>
+              <DataGrid
+                filas={reporte.clientes} clave={(c) => c.idCliente} porPagina={10} compacta ordenInicial={{ id: 'total', dir: 'desc' }}
+                buscar={(c) => c.nombreCliente} placeholderBuscar="Buscar cliente…" vacio="No hay saldos pendientes."
+                onFila={(c) => abrir({ tipo: 'cliente', id: c.idCliente })} etiquetaFila={(c) => `Ver ficha de ${c.nombreCliente}`}
+                columnas={[
+                  { id: 'n', encabezado: 'Cliente', valor: (c) => c.nombreCliente, render: (c) => <span className="font-medium text-slate-900">{c.nombreCliente}</span>, total: () => 'Total' },
+                  { id: 'c', encabezado: 'Corriente', alinear: 'der', valor: (c) => c.corriente, render: (c) => Q(c.corriente), total: () => Q(t.corriente) },
+                  { id: 'a', encabezado: '1-30', alinear: 'der', valor: (c) => c.dias1a30, render: (c) => Q(c.dias1a30), total: () => Q(t.dias1a30) },
+                  { id: 'b', encabezado: '31-60', alinear: 'der', valor: (c) => c.dias31a60, render: (c) => Q(c.dias31a60), total: () => Q(t.dias31a60) },
+                  { id: 'd', encabezado: '61-90', alinear: 'der', valor: (c) => c.dias61a90, render: (c) => Q(c.dias61a90), total: () => Q(t.dias61a90) },
+                  { id: 'm', encabezado: '+90', alinear: 'der', valor: (c) => c.mas90, render: (c) => (c.mas90 > 0 ? <span className="font-semibold text-red-700">{Q(c.mas90)}</span> : Q(c.mas90)), total: () => Q(t.mas90) },
+                  { id: 'total', encabezado: 'Total', alinear: 'der', valor: (c) => c.total, render: (c) => <strong>{Q(c.total)}</strong>, total: () => Q(t.total) },
+                  {
+                    id: 'p', encabezado: '% cartera', ancho: '110px', valor: (c) => c.total,
+                    render: (c) => <span className="flex items-center gap-2"><Medidor valor={parte(c.total)} max={Math.max(...reporte.clientes.map((x) => parte(x.total)), 1)} etiqueta="Participación en la cartera" /><span className="w-10 text-right text-[12px] tabular-nums text-slate-600">{pct(parte(c.total))}</span></span>,
+                  },
+                ]} />
+          </Panel>
         </div>
       )}
-
-      <DataTable
-        isLoading={isLoading}
-        data={reporte?.clientes ?? []}
-        emptyText="No hay saldos pendientes"
-        columns={[
-          { header: 'Cliente', accessorKey: 'nombreCliente' },
-          { header: 'Corriente', accessorKey: 'corriente', align: 'right', cell: ({ value }: any) => money(value) },
-          { header: '1-30 días', accessorKey: 'dias1a30', align: 'right', cell: ({ value }: any) => money(value) },
-          { header: '31-60 días', accessorKey: 'dias31a60', align: 'right', cell: ({ value }: any) => money(value) },
-          { header: '61-90 días', accessorKey: 'dias61a90', align: 'right', cell: ({ value }: any) => money(value) },
-          { header: '+90 días', accessorKey: 'mas90', align: 'right', cell: ({ value }: any) => (Number(value) > 0 ? <span className="text-red-600 font-semibold">{money(value)}</span> : money(value)) },
-          { header: 'Total', accessorKey: 'total', align: 'right', cell: ({ value }: any) => <span className="font-semibold">{money(value)}</span> },
-          { header: '% cartera', align: 'right', cell: ({ row }: any) => (totales && totales.total > 0 ? `${((row.total / totales.total) * 100).toFixed(1)} %` : '—') },
-        ]}
-      />
+      {host}
     </div>
   );
 };

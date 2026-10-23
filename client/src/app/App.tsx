@@ -3,11 +3,23 @@ import { ComponentShowcase } from '../components/ui/ComponentShowcase';
 import { routes } from './routes';
 import { AppErrorBoundary } from '../shared/components';
 import { ToastProvider } from '../shared/components/Toast';
+import { AuthProvider } from '../shared/auth/AuthContext';
+import { ProtectedRoute } from '../modules/auth/ProtectedRoute';
+import LoginPage from '../modules/auth/LoginPage';
+import CambiarClavePage from '../modules/auth/CambiarClavePage';
+import RecuperarClavePage from '../modules/auth/RecuperarClavePage';
+import RestablecerClavePage from '../modules/auth/RestablecerClavePage';
 
 const router = createBrowserRouter([
-  { path: '/', element: <Navigate to="/cxc/documentos/documentos" replace /> },
-  { path: '/ui-kit', element: <ComponentShowcase /> },
-  ...routes,
+  // Públicas
+  { path: '/login', element: <LoginPage /> },
+  { path: '/cambiar-clave', element: <CambiarClavePage /> },
+  { path: '/recuperar-clave', element: <RecuperarClavePage /> },
+  { path: '/restablecer-clave', element: <RestablecerClavePage /> },
+  // Protegidas: todo lo demás exige sesión.
+  { path: '/', element: <ProtectedRoute><Navigate to="/cxc/dashboard" replace /></ProtectedRoute> },
+  { path: '/ui-kit', element: <ProtectedRoute><ComponentShowcase /></ProtectedRoute> },
+  ...routes.map((r) => ({ ...r, element: <ProtectedRoute>{r.element}</ProtectedRoute> })),
   {
     path: '*',
     element: (
@@ -28,7 +40,9 @@ export default function App() {
     <AppErrorBoundary>
       <div className="erp-app min-h-screen bg-slate-50">
         <ToastProvider>
-          <RouterProvider router={router} />
+          <AuthProvider>
+            <RouterProvider router={router} />
+          </AuthProvider>
         </ToastProvider>
       </div>
     </AppErrorBoundary>

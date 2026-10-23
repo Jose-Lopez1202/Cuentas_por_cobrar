@@ -4,6 +4,7 @@ export * from './modules/compras';
 export * from './modules/bancos';
 export * from './modules/cxp';
 export * from './modules/cxc';
+export * from './modules/auth';
 
 // Reexportación explícita de constantes runtime utilizadas por los
 // componentes Select del frontend.
@@ -22,3 +23,6 @@ export { ESTADOS_RECIBO } from './modules/cxc/pagos/recibo';
 export { ESTADOS_DOCUMENTO } from './modules/cxc/documentos/documento';
 // Constantes de facturación FEL usadas por el formulario del cliente
 export { IVA_GT, LIMITE_CONSUMIDOR_FINAL } from "./modules/cxc/facturacion/factura";
+
+// Autenticación: reglas de contraseña y roles usados por el login del cliente
+export { ROLES, ROL_LABEL, PASSWORD_MIN, PASSWORD_MAX, evaluarClave, clavePermitida, fortalezaClave, USERNAME_REGEX, crearUsuarioSchema, editarUsuarioSchema, recuperarClaveSchema, restablecerClaveSchema } from "./modules/auth/auth";
