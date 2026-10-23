@@ -9,6 +9,16 @@ export interface FiltrosAnalitica {
   idEmpleado?: number;
   /** Limita a los clientes que pertenecen a una ruta. */
   idRuta?: number;
+  /** Selecciones cruzadas (clic en un gráfico). */
+  idCliente?: number;
+  idFormaPago?: number;
+  /** 1 = lunes ... 7 = domingo. */
+  diaSemana?: number;
+  diaMes?: number;
+  /** Tramo de antigüedad: 1 = al corriente ... 5 = más de 90 días. */
+  tramo?: number;
+  /** Nombre base de una zona de rutas. */
+  baseRuta?: string;
 }
 
 export interface Comparativo {
@@ -31,6 +41,7 @@ export interface RutaOpcion {
 export interface CatalogoFiltrosAnalitica {
   cobradores: CobradorOpcion[];
   rutas: RutaOpcion[];
+  formasPago: Array<{ idFormaPago: number; nombre: string }>;
 }
 
 // --- Panel ejecutivo ---------------------------------------------------------------
@@ -53,6 +64,8 @@ export interface PuntoSerie {
 }
 
 export interface TramoAntiguedad {
+  /** 1 = al corriente ... 5 = más de 90 días. */
+  orden: number;
   tramo: string;
   monto: number;
   documentos: number;
@@ -93,7 +106,7 @@ export interface ResumenEjecutivo {
   serie: PuntoSerie[];
   antiguedad: TramoAntiguedad[];
   topDeudores: DeudorResumen[];
-  formasPago: Array<{ formaPago: string; pagos: number; monto: number }>;
+  formasPago: Array<{ idFormaPago: number; formaPago: string; pagos: number; monto: number }>;
   gestionesPorResultado: Array<{ resultado: string; cantidad: number }>;
   promesas: Array<{ estado: string; cantidad: number; monto: number }>;
   vencimientosProximos: Array<{ semana: string; desde: string; monto: number; documentos: number }>;
@@ -240,7 +253,10 @@ export interface RutasReporte {
   desde: string;
   hasta: string;
   totales: { rutas: number; recurrentes: number; paradas: number; visitadas: number; efectividad: number };
+  /** Zonas filtradas por la selección actual. */
   rutas: RutaRecurrente[];
+  /** Todas las zonas, sin aplicar la selección de zona (para el gráfico que se usa para elegir). */
+  zonas: RutaRecurrente[];
   clientesRecurrentes: ClienteRecurrenteRuta[];
   porEstado: Array<{ estado: string; cantidad: number }>;
 }

@@ -28,7 +28,16 @@ function entero(v: unknown, nombre: string): number | undefined {
   return n;
 }
 
-export interface QueryFiltros { desde?: unknown; hasta?: unknown; idEmpleado?: unknown; idRuta?: unknown }
+export interface QueryFiltros {
+  desde?: unknown; hasta?: unknown; idEmpleado?: unknown; idRuta?: unknown;
+  idCliente?: unknown; idFormaPago?: unknown; diaSemana?: unknown; diaMes?: unknown; tramo?: unknown; baseRuta?: unknown;
+}
+
+function rango(v: unknown, nombre: string, max: number): number | undefined {
+  const n = entero(v, nombre);
+  if (n !== undefined && n > max) throw new BadRequestError(`El filtro "${nombre}" está fuera de rango.`);
+  return n;
+}
 
 /** Valida los filtros y calcula el período anterior (misma duración, inmediatamente antes). */
 export function resolverAlcance(q: QueryFiltros): Alcance {
@@ -46,6 +55,12 @@ export function resolverAlcance(q: QueryFiltros): Alcance {
     hastaAnt: aIso(aMs(desde) - DIA_MS),
     idEmpleado: entero(q.idEmpleado, 'cobrador'),
     idRuta: entero(q.idRuta, 'ruta'),
+    idCliente: entero(q.idCliente, 'cliente'),
+    idFormaPago: entero(q.idFormaPago, 'forma de pago'),
+    diaSemana: rango(q.diaSemana, 'día de la semana', 7),
+    diaMes: rango(q.diaMes, 'día del mes', 31),
+    tramo: rango(q.tramo, 'tramo', 5),
+    baseRuta: typeof q.baseRuta === 'string' && q.baseRuta.trim() ? q.baseRuta.trim().slice(0, 150) : undefined,
   };
 }
 
@@ -87,7 +102,8 @@ export async function resumenEjecutivo(q: QueryFiltros): Promise<ResumenEjecutiv
   const carteraTotal = num(c?.TOTAL);
   const carteraVencida = num(c?.VENCIDA);
   const dias = Math.round((aMs(a.hasta) - aMs(a.desde)) / DIA_MS) + 1;
-  const filtraCobrador = Boolean(a.idEmpleado);
+  // Con una selección sobre el cobro (cobrador, forma de pago, día) la facturación ya no es comparable.
+  const filtraCobrador = Boolean(a.idEmpleado || a.idFormaPago || a.diaSemana || a.diaMes);
 
   const cartera = {
     total: round2(carteraTotal),
@@ -154,12 +170,15 @@ export async function resumenEjecutivo(q: QueryFiltros): Promise<ResumenEjecutiv
     },
     cartera,
     serie,
-    antiguedad: raw.antiguedad.map((r) => ({ tramo: r.TRAMO, monto: round2(num(r.MONTO)), documentos: num(r.DOCS) })),
+    antiguedad: TRAMOS.map((nombre, i) => {
+      const f = raw.antiguedad.find((r) => num(r.ORDEN) === i + 1);
+      return { orden: i + 1, tramo: nombre, monto: round2(num(f?.MONTO)), documentos: num(f?.DOCS) };
+    }),
     topDeudores: raw.deudores.map((r) => ({
       idCliente: r.ID_CLIENTE, nombre: r.NOMBRE, nit: r.NIT, saldoTotal: round2(num(r.SALDO)), saldoVencido: round2(num(r.VENCIDO)),
       diasMaxMora: num(r.DIAS), documentosVencidos: num(r.DOCS_VENC),
     })),
-    formasPago: raw.formas.map((r) => ({ formaPago: r.FORMA, pagos: num(r.PAGOS), monto: round2(num(r.MONTO)) })),
+    formasPago: raw.formas.map((r) => ({ idFormaPago: r.ID, formaPago: r.FORMA, pagos: num(r.PAGOS), monto: round2(num(r.MONTO)) })),
     gestionesPorResultado: raw.gestionesResultado.map((r) => ({ resultado: r.RESULTADO, cantidad: num(r.N) })),
     promesas: raw.promesas.map((r) => ({ estado: r.ESTADO, cantidad: num(r.N), monto: round2(num(r.MONTO)) })),
     vencimientosProximos: raw.vencimientos.map((r) => ({ semana: semanaEtiqueta(num(r.SEMANA)), desde: r.DESDE, monto: round2(num(r.MONTO)), documentos: num(r.DOCS) })),
@@ -168,6 +187,7 @@ export async function resumenEjecutivo(q: QueryFiltros): Promise<ResumenEjecutiv
   };
 }
 
+const TRAMOS = ['Al corriente', '1 a 30 días', '31 a 60 días', '61 a 90 días', 'Más de 90 días'];
 const fmtQ = (n: number) => `Q ${n.toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const semanaEtiqueta = (n: number) => (n === 0 ? 'Esta semana' : n === 1 ? 'Próxima semana' : `En ${n} semanas`);
 
@@ -250,8 +270,16 @@ const DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sáb
 
 export async function diasCobro(q: QueryFiltros): Promise<DiasCobroReporte> {
   const a = resolverAlcance(q);
-  const filas = await repo.cobradoPorFecha(a);
-  const total = round2(filas.reduce((s, f) => s + f.cobrado, 0));
+  // El gráfico por día de la semana no se filtra por el día elegido (sigue mostrando todos); igual el del mes.
+  const [filas, filasSemana, filasMes] = await Promise.all([
+    repo.cobradoPorFecha(a),
+    a.diaSemana ? repo.cobradoPorFecha({ ...a, diaSemana: undefined }) : null,
+    a.diaMes ? repo.cobradoPorFecha({ ...a, diaMes: undefined }) : null,
+  ]);
+  const paraSemana = filasSemana ?? filas;
+  const paraMes = filasMes ?? filas;
+  const suma = (f: typeof filas) => round2(f.reduce((s, x) => s + x.cobrado, 0));
+  const total = suma(filas);
 
   // Cuántas veces ocurre cada día de la semana / del mes dentro del período (para promediar bien).
   const ocurrenciaSemana = new Array(8).fill(0);
@@ -262,26 +290,29 @@ export async function diasCobro(q: QueryFiltros): Promise<DiasCobroReporte> {
     ocurrenciaMes[d.getUTCDate()] += 1;
   }
 
-  const semana = Array.from({ length: 7 }, (_, i) => ({ cobrado: 0, pagos: 0, dias: 0 }));
+  const semana = Array.from({ length: 7 }, () => ({ cobrado: 0, pagos: 0, dias: 0 }));
   const mes = Array.from({ length: 31 }, () => ({ cobrado: 0, pagos: 0, dias: 0 }));
   const calor = new Map<string, { cobrado: number; pagos: number }>();
-  for (const f of filas) {
+  for (const f of paraSemana) {
     const d = new Date(`${f.fecha}T00:00:00Z`);
     const dow = (d.getUTCDay() + 6) % 7; // 0 = lunes
-    const dm = d.getUTCDate();
     semana[dow].cobrado += f.cobrado; semana[dow].pagos += f.pagos; semana[dow].dias += 1;
-    mes[dm - 1].cobrado += f.cobrado; mes[dm - 1].pagos += f.pagos; mes[dm - 1].dias += 1;
-    const k = `${dow + 1}-${Math.ceil(dm / 7)}`;
+    const k = `${dow + 1}-${Math.ceil(d.getUTCDate() / 7)}`;
     const c = calor.get(k) ?? { cobrado: 0, pagos: 0 };
     c.cobrado += f.cobrado; c.pagos += f.pagos; calor.set(k, c);
   }
+  for (const f of paraMes) {
+    const dm = new Date(`${f.fecha}T00:00:00Z`).getUTCDate();
+    mes[dm - 1].cobrado += f.cobrado; mes[dm - 1].pagos += f.pagos; mes[dm - 1].dias += 1;
+  }
 
-  const aDia = (valor: number, etiqueta: string, v: { cobrado: number; pagos: number; dias: number }, ocurrencias: number): DiaCobro => ({
+  const aDia = (valor: number, etiqueta: string, v: { cobrado: number; pagos: number; dias: number }, ocurrencias: number, base: number): DiaCobro => ({
     valor, etiqueta, cobrado: round2(v.cobrado), pagos: v.pagos, diasConCobro: v.dias,
-    promedio: ocurrencias > 0 ? round2(v.cobrado / ocurrencias) : 0, participacion: porcentaje(v.cobrado, total),
+    promedio: ocurrencias > 0 ? round2(v.cobrado / ocurrencias) : 0, participacion: porcentaje(v.cobrado, base),
   });
-  const porDiaSemana = semana.map((v, i) => aDia(i + 1, DIAS_SEMANA[i], v, ocurrenciaSemana[i + 1]));
-  const porDiaMes = mes.map((v, i) => aDia(i + 1, String(i + 1), v, ocurrenciaMes[i + 1]));
+  const totalSemana = suma(paraSemana), totalMes = suma(paraMes);
+  const porDiaSemana = semana.map((v, i) => aDia(i + 1, DIAS_SEMANA[i], v, ocurrenciaSemana[i + 1], totalSemana));
+  const porDiaMes = mes.map((v, i) => aDia(i + 1, String(i + 1), v, ocurrenciaMes[i + 1], totalMes));
 
   const mejor = (arr: DiaCobro[]) => arr.filter((d) => d.promedio > 0).sort((x, y) => y.promedio - x.promedio)[0] ?? null;
   const peor = (arr: DiaCobro[]) => arr.filter((d) => d.promedio >= 0).sort((x, y) => x.promedio - y.promedio)[0] ?? null;
@@ -328,14 +359,10 @@ export async function diasCobroDetalle(q: QueryFiltros & { tipo?: unknown; valor
 
 // --- Rutas -----------------------------------------------------------------------------------------------------
 
-export async function rutas(q: QueryFiltros): Promise<RutasReporte> {
-  const a = resolverAlcance(q);
-  const { filas, clientes } = await repo.rutasRaw(a);
-
+function agruparRutas(filas: Awaited<ReturnType<typeof repo.rutasRaw>>['filas']) {
   const grupos = new Map<string, typeof filas>();
   filas.forEach((f) => { const l = grupos.get(f.BASE) ?? []; l.push(f); grupos.set(f.BASE, l); });
-
-  const lista = [...grupos.entries()].map(([base, items]) => {
+  return [...grupos.entries()].map(([base, items]) => {
     const fechas = items.map((i) => i.F).sort();
     let frecuencia: number | null = null;
     if (fechas.length > 1) {
@@ -356,6 +383,16 @@ export async function rutas(q: QueryFiltros): Promise<RutasReporte> {
       canceladas: items.filter((i) => i.ESTADO === 'CANCELADA').length,
     };
   }).sort((x, y) => y.veces - x.veces || y.montoPendiente - x.montoPendiente);
+}
+
+export async function rutas(q: QueryFiltros): Promise<RutasReporte> {
+  const a = resolverAlcance(q);
+  const [{ filas, clientes }, todas] = await Promise.all([
+    repo.rutasRaw(a),
+    a.baseRuta ? repo.rutasRaw({ ...a, baseRuta: undefined }) : null,
+  ]);
+  const lista = agruparRutas(filas);
+  const zonas = todas ? agruparRutas(todas.filas) : lista;
 
   const estados = new Map<string, number>();
   filas.forEach((f) => estados.set(f.ESTADO, (estados.get(f.ESTADO) ?? 0) + 1));
@@ -366,6 +403,7 @@ export async function rutas(q: QueryFiltros): Promise<RutasReporte> {
     desde: a.desde, hasta: a.hasta,
     totales: { rutas: filas.length, recurrentes: lista.filter((r) => r.veces > 1).length, paradas, visitadas, efectividad: porcentaje(visitadas, paradas) },
     rutas: lista,
+    zonas,
     clientesRecurrentes: clientes.map((c) => ({
       idCliente: c.ID, nombre: c.NOMBRE, veces: num(c.VECES), visitadas: num(c.VISITADAS), noEncontrado: num(c.NO_ENC), saldoVencido: round2(num(c.VENCIDO)),
     })),

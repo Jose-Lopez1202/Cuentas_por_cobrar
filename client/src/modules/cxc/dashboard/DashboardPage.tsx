@@ -17,7 +17,7 @@ import { useDetalle } from '../analisis/detalle/DetalleHost';
 
 export const DashboardPage = () => {
   const navigate = useNavigate();
-  const { filtros, query, cambiar, limpiar, hayFiltrosExtra } = useFiltros('90d');
+  const { filtros, query, cambiar, alternar, limpiar, hayFiltrosExtra } = useFiltros('90d');
   const { data, loading, error, reload } = useApi<ResumenEjecutivo>('/cxc/analitica/resumen', query);
   const { abrir, host } = useDetalle(query);
   const rangoValido = filtros.desde <= filtros.hasta;
@@ -53,7 +53,7 @@ export const DashboardPage = () => {
 
   return (
     <div>
-      <FilterBar filtros={filtros} onChange={cambiar} onLimpiar={limpiar} mostrarLimpiar={hayFiltrosExtra}
+      <FilterBar filtros={filtros} onChange={cambiar} onLimpiar={limpiar} mostrarLimpiar={hayFiltrosExtra} cliente
         nota="La cartera y la antigüedad muestran el saldo de hoy; el cobrador solo filtra el cobro y la gestión" />
 
       <Encabezado
@@ -121,9 +121,10 @@ export const DashboardPage = () => {
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <Panel titulo="Antigüedad de la cartera" subtitulo="Saldo pendiente según los días que lleva vencido">
               <ColumnasChart etiquetaValor="Saldo" alto={230}
-                datos={data.antiguedad.map((t, i) => ({ clave: t.tramo, etiqueta: ['Corriente', '1-30', '31-60', '61-90', '+90'][i] ?? t.tramo, valor: t.monto, extra: `${t.documentos} documento(s)`, color: RAMPA_AZUL[i] }))}
-                onSeleccionar={() => navigate('/cxc/reportes/antiguedad-saldos')} />
-              <p className="mt-2 text-[11.5px] text-slate-500">Haz clic en una columna para abrir el reporte completo.</p>
+                datos={data.antiguedad.map((t, i) => ({ clave: String(t.orden), etiqueta: ['Corriente', '1-30', '31-60', '61-90', '+90'][i] ?? t.tramo, valor: t.monto, extra: `${t.documentos} documento(s)`, color: RAMPA_AZUL[i] }))}
+                destacada={filtros.tramo ? String(filtros.tramo) : undefined}
+                onSeleccionar={(d) => alternar('tramo', Number(d.clave))} />
+              <p className="mt-2 text-[11.5px] text-slate-500">Clic en una columna para filtrar todo el tablero por ese tramo. <button type="button" onClick={() => navigate('/cxc/reportes/antiguedad-saldos')} className="font-medium text-blue-800 hover:underline">Ver reporte completo</button></p>
             </Panel>
 
             <Panel titulo="Vencimientos próximos" subtitulo="Lo que vence en las siguientes 4 semanas">
@@ -133,8 +134,9 @@ export const DashboardPage = () => {
                   datos={data.vencimientosProximos.map((v) => ({ clave: v.desde, etiqueta: v.semana.replace('Próxima semana', 'Próxima').replace('Esta semana', 'Esta'), valor: v.monto, extra: `${v.documentos} documento(s) desde ${fechaCorta(v.desde, false)}` }))} />}
             </Panel>
 
-            <Panel titulo="Cobro por forma de pago" subtitulo="Pagos aplicados en el período">
-              <RankBars items={data.formasPago.map((f) => ({ clave: f.formaPago, etiqueta: f.formaPago, valor: f.monto, secundario: `${f.pagos} pagos` }))} vacio="Sin pagos aplicados en el período." />
+            <Panel titulo="Cobro por forma de pago" subtitulo="Pagos aplicados en el período. Clic para filtrar">
+              <RankBars items={data.formasPago.map((f) => ({ clave: f.idFormaPago, etiqueta: f.formaPago, valor: f.monto, secundario: `${f.pagos} pagos` }))}
+                seleccionada={filtros.idFormaPago} onSeleccionar={(i) => alternar('idFormaPago', Number(i.clave))} vacio="Sin pagos aplicados en el período." />
             </Panel>
           </div>
 
@@ -152,10 +154,11 @@ export const DashboardPage = () => {
             </Panel>
 
             <div className="space-y-4">
-              <Panel titulo="Cobradores que más cobran" subtitulo="Clic para ver su desempeño"
+              <Panel titulo="Cobradores que más cobran" subtitulo="Clic para filtrar por la persona; el ícono abre su ficha"
                 acciones={<button type="button" onClick={() => navigate('/cxc/analisis/cobradores')} className="text-[12px] font-medium text-blue-800 hover:underline">Ver ranking</button>}>
                 <RankBars items={data.topCobradores.map((c) => ({ clave: c.idEmpleado, etiqueta: c.nombre, valor: c.cobrado }))}
-                  formato={Qc} onSeleccionar={(i) => abrir({ tipo: 'cobrador', id: Number(i.clave) })} vacio="Aún no hay cobros registrados por cobrador." />
+                  formato={Qc} seleccionada={filtros.idEmpleado} onSeleccionar={(i) => alternar('idEmpleado', Number(i.clave))}
+                  onDetalle={(i) => abrir({ tipo: 'cobrador', id: Number(i.clave) })} vacio="Aún no hay cobros registrados por cobrador." />
               </Panel>
               <Panel titulo="Promesas de pago" subtitulo="Compromisos registrados en el período">
                 {data.promesas.length === 0 ? <Vacio texto="Sin promesas en el período" /> : (

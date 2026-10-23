@@ -14,7 +14,7 @@ import { useDetalle } from './detalle/DetalleHost';
 type Medida = 'promedio' | 'total';
 
 export const DiasCobroPage = () => {
-  const { filtros, query, cambiar, limpiar, hayFiltrosExtra } = useFiltros('90d');
+  const { filtros, query, cambiar, alternar, limpiar, hayFiltrosExtra } = useFiltros('90d');
   const { data, loading, error, reload } = useApi<DiasCobroReporte>('/cxc/analitica/dias-cobro', query);
   const { abrir, host } = useDetalle(query);
   const [medida, setMedida] = useState<Medida>('promedio');
@@ -36,7 +36,7 @@ export const DiasCobroPage = () => {
 
   return (
     <div>
-      <FilterBar filtros={filtros} onChange={cambiar} onLimpiar={limpiar} mostrarLimpiar={hayFiltrosExtra}
+      <FilterBar filtros={filtros} onChange={cambiar} onLimpiar={limpiar} mostrarLimpiar={hayFiltrosExtra} cliente
         nota="Se cuenta el día en que el pago se aplicó a la factura" />
       <Encabezado
         titulo="Mejores días de cobro"
@@ -51,7 +51,7 @@ export const DiasCobroPage = () => {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <KpiCard etiqueta="Total cobrado" valor={Q(data.totalCobrado)} color={COLOR.azul} nota={`${entero(data.porDiaSemana.reduce((s, d) => s + d.pagos, 0))} pagos aplicados`} />
             <KpiCard etiqueta="Mejor día de la semana" valor={mejor?.etiqueta ?? '—'} color={COLOR.aqua}
-              nota={mejor ? `${Q(mejor.promedio)} en promedio por ${mejor.etiqueta.toLowerCase()}` : 'Sin cobros'} onClick={mejor ? () => abrir({ tipo: 'pagos', titulo: `Cobros de los ${mejor.etiqueta.toLowerCase()}`, modo: 'semana', valor: mejor.valor }) : undefined} />
+              nota={mejor ? `${Q(mejor.promedio)} en promedio por ${mejor.etiqueta.toLowerCase()}` : 'Sin cobros'} onClick={mejor ? () => alternar('diaSemana', mejor.valor) : undefined} />
             <KpiCard etiqueta="Día más flojo" valor={peor?.etiqueta ?? '—'} color={COLOR.naranja}
               nota={peor ? `${Q(peor.promedio)} en promedio${veces ? ` · ${veces.toLocaleString('es-GT', { maximumFractionDigits: 1 })}× menos que el mejor` : ''}` : 'El período debe incluir todos los días de la semana'} />
             <KpiCard etiqueta="Mejor día del mes" valor={data.mejorDiaMes ? `Día ${data.mejorDiaMes.valor}` : '—'} color={COLOR.violeta}
@@ -80,14 +80,15 @@ export const DiasCobroPage = () => {
                 </div>}>
               <ColumnasChart
                 etiquetaValor={medida === 'promedio' ? 'Promedio por día' : 'Total cobrado'}
-                destacada={mejor ? String(mejor.valor) : undefined}
+                destacada={filtros.diaSemana ? String(filtros.diaSemana) : mejor ? String(mejor.valor) : undefined}
                 datos={data.porDiaSemana.map((d) => ({ clave: String(d.valor), etiqueta: d.etiqueta.slice(0, 3), valor: valorDe(d), extra: `${entero(d.pagos)} pagos · ${pct(d.participacion)} del total` }))}
-                onSeleccionar={(d) => { const dia = data.porDiaSemana.find((x) => String(x.valor) === d.clave); if (dia) abrir({ tipo: 'pagos', titulo: `Cobros de los ${dia.etiqueta.toLowerCase()}`, modo: 'semana', valor: dia.valor }); }} />
-              <p className="mt-2 text-[11.5px] text-slate-500">Haz clic en una columna para ver los pagos de ese día.</p>
+                onSeleccionar={(d) => alternar('diaSemana', Number(d.clave))} />
+              <p className="mt-2 flex flex-wrap items-center gap-x-3 text-[11.5px] text-slate-500">Clic en una columna para filtrar todo el tablero por ese día.
+                {filtros.diaSemana && <button type="button" onClick={() => abrir({ tipo: 'pagos', titulo: `Cobros de los ${data.porDiaSemana[filtros.diaSemana! - 1]?.etiqueta.toLowerCase()}`, modo: 'semana', valor: filtros.diaSemana! })} className="font-medium text-blue-800 hover:underline">Ver los pagos de ese día</button>}</p>
             </Panel>
 
             <Panel titulo="Mapa de calor" subtitulo="Cuánto se cobró según el día de la semana y la semana del mes" cargando={loading}>
-              <MapaCalor celdas={data.calor} onSeleccionar={(dia) => { const d = data.porDiaSemana.find((x) => x.valor === dia); if (d) abrir({ tipo: 'pagos', titulo: `Cobros de los ${d.etiqueta.toLowerCase()}`, modo: 'semana', valor: dia }); }} />
+              <MapaCalor celdas={data.calor} diaSeleccionado={filtros.diaSemana} onSeleccionar={(dia) => alternar('diaSemana', dia)} />
             </Panel>
           </div>
 
@@ -95,15 +96,17 @@ export const DiasCobroPage = () => {
             <Panel className="xl:col-span-2" titulo="Cobro por día del mes" subtitulo="Revela ciclos de pago: quincenas, fin de mes, fechas de planilla" cargando={loading}>
               <ColumnasChart
                 alto={230} etiquetaValor={medida === 'promedio' ? 'Promedio' : 'Total cobrado'}
-                destacada={data.mejorDiaMes ? String(data.mejorDiaMes.valor) : undefined}
+                destacada={filtros.diaMes ? String(filtros.diaMes) : data.mejorDiaMes ? String(data.mejorDiaMes.valor) : undefined}
                 datos={data.porDiaMes.map((d) => ({ clave: String(d.valor), etiqueta: String(d.valor), valor: valorDe(d), extra: `${entero(d.pagos)} pagos` }))}
-                onSeleccionar={(d) => abrir({ tipo: 'pagos', titulo: `Cobros del día ${d.clave} de cada mes`, modo: 'mes', valor: Number(d.clave) })} />
+                onSeleccionar={(d) => alternar('diaMes', Number(d.clave))} />
+              <p className="mt-2 flex flex-wrap items-center gap-x-3 text-[11.5px] text-slate-500">Clic en una columna para filtrar por ese día del mes.
+                {filtros.diaMes && <button type="button" onClick={() => abrir({ tipo: 'pagos', titulo: `Cobros del día ${filtros.diaMes} de cada mes`, modo: 'mes', valor: filtros.diaMes! })} className="font-medium text-blue-800 hover:underline">Ver esos pagos</button>}</p>
             </Panel>
 
             <Panel titulo="Fechas con más cobro" subtitulo="Los 5 días individuales más fuertes">
               <RankBars
                 items={data.mejoresFechas.map((f) => ({ clave: f.fecha, etiqueta: fechaCorta(f.fecha), valor: f.cobrado, secundario: `${f.pagos} pagos` }))}
-                onSeleccionar={(i) => abrir({ tipo: 'pagos', titulo: `Cobros del ${fechaCorta(String(i.clave))}`, modo: 'fecha', valor: String(i.clave) })}
+                onDetalle={(i) => abrir({ tipo: 'pagos', titulo: `Cobros del ${fechaCorta(String(i.clave))}`, modo: 'fecha', valor: String(i.clave) })}
                 vacio="No hay cobros en el período." />
             </Panel>
           </div>
