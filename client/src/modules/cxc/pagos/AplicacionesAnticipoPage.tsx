@@ -46,8 +46,8 @@ export const AplicacionesAnticipoPage = () => {
 
       <div className="bg-white p-4 rounded-lg border border-slate-200">
         <TextInput
-          icon={Search}
-          placeholder="Buscar por anticipo, documento o ID..."
+          icon={Search} maxLength={100}
+          placeholder="Buscar cliente, documento, anticipo o ID..."
           value={search}
           onChange={(e: any) => {
             setSearch(e.target.value);
@@ -135,8 +135,6 @@ export const AplicacionesAnticipoPage = () => {
           description={`Se le devolverá ${money(aReversar.montoAplicado)} al saldo del documento y al disponible del anticipo.`}
           endpoint={`/cxc/aplicaciones-anticipo/${aReversar.idAplicacionAnticipo}/reversar`}
           actionLabel="Reversar"
-          empleadoLabel="Empleado que reversa"
-          empleadoFieldName="idEmpleadoReversa"
           motivoLabel="Motivo de la reversa"
           motivoFieldName="motivoReversa"
           onClose={() => setAReversar(null)}

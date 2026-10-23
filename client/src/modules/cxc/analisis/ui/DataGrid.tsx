@@ -82,7 +82,7 @@ export function DataGrid<T>({
               <input
                 type="search" value={texto} placeholder={placeholderBuscar} aria-label={placeholderBuscar}
                 onChange={(e) => { setTexto(e.target.value); setPagina(1); }}
-                className="h-8 w-64 rounded border border-slate-300 bg-white pl-8 pr-2 text-[13px] outline-none placeholder:text-slate-400 hover:border-slate-400 focus:border-blue-700 focus:ring-2 focus:ring-blue-100"
+                className="h-10 w-full sm:w-80 rounded-md border border-slate-300 bg-white pl-8 pr-2 text-sm outline-none placeholder:text-slate-400 hover:border-slate-400 focus:border-blue-700 focus:ring-2 focus:ring-blue-100"
               />
             </div>
           ) : <span />}

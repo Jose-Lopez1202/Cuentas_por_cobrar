@@ -57,7 +57,7 @@ export const NotasCreditoPage = () => {
 
       <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
         <TextInput
-          icon={Search}
+          icon={Search} maxLength={100}
           placeholder="Buscar cliente, serie, número, estado..."
           value={search}
           onChange={(e: any) => { setSearch(e.target.value); setPage(1); }}
@@ -157,8 +157,6 @@ export const NotasCreditoPage = () => {
           description="La nota quedará marcada como anulada de forma permanente. Solo se puede anular una nota sin aplicaciones vigentes."
           endpoint={`/cxc/notas-credito/${aAnular.idNotaCredito}/anular`}
           actionLabel="Anular"
-          empleadoLabel="Empleado que anula"
-          empleadoFieldName="idEmpleadoAnulacion"
           motivoLabel="Motivo de la anulación"
           motivoFieldName="motivoAnulacion"
           onClose={() => setAAnular(null)}

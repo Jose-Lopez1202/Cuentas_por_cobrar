@@ -11,6 +11,7 @@ import {
   type ValidationErrors,
 } from '../../../../shared/validation';
 import type { Ajuste, DocumentoCatalogoOption } from '@erp/contracts';
+import { SearchableSelect } from '../../../../shared/components/SearchableSelect';
 
 const TIPO_OPTIONS = [
   { value: 'DEBITO', label: 'Débito — aumenta el saldo' },
@@ -27,7 +28,6 @@ export const AjusteForm = ({ ajuste, onSuccess, onCancel }: Props) => {
   const isEditing = Boolean(ajuste);
   const isLocked = isEditing && ajuste!.estado !== 'PENDIENTE';
   const [clientes, setClientes] = useState<DocumentoCatalogoOption[]>([]);
-  const [empleados, setEmpleados] = useState<DocumentoCatalogoOption[]>([]);
   const [documentos, setDocumentos] = useState<DocumentoCatalogoOption[]>([]);
 
   const [idCliente, setIdCliente] = useState(ajuste?.idCliente?.toString() ?? '');
@@ -36,25 +36,15 @@ export const AjusteForm = ({ ajuste, onSuccess, onCancel }: Props) => {
   const [monto, setMonto] = useState(ajuste?.monto?.toString() ?? '');
   const [motivo, setMotivo] = useState(ajuste?.motivo ?? '');
   const [fecha, setFecha] = useState(ajuste?.fecha?.slice(0, 10) ?? todayIso());
-  const [idEmpleado, setIdEmpleado] = useState(ajuste?.idEmpleado?.toString() ?? '');
 
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    Promise.all([
-      apiClient.get<DocumentoCatalogoOption[]>('/cxc/documentos/catalogos/clientes'),
-      apiClient.get<DocumentoCatalogoOption[]>('/cxc/documentos/catalogos/empleados'),
-    ])
-      .then(([clientesData, empleadosData]) => {
-        setClientes(clientesData);
-        setEmpleados(empleadosData);
-      })
-      .catch(() => {
-        setClientes([]);
-        setEmpleados([]);
-      });
+    apiClient.get<DocumentoCatalogoOption[]>('/cxc/documentos/catalogos/clientes')
+      .then(setClientes)
+      .catch(() => setClientes([]));
   }, []);
 
   useEffect(() => {
@@ -94,13 +84,11 @@ export const AjusteForm = ({ ajuste, onSuccess, onCancel }: Props) => {
     const fechaErr = validateRequiredDate(fecha, 'La fecha', { notFuture: true, maxDate: todayIso() });
     if (fechaErr) next.fecha = fechaErr;
 
-    const empleadoErr = validateRequiredSelect(idEmpleado, 'un empleado');
-    if (empleadoErr) next.idEmpleado = empleadoErr;
 
     if (motivo.trim().length < 10) next.motivo = 'Describe el motivo del ajuste con al menos 10 caracteres.';
     else if (motivo.length > 250) next.motivo = 'El motivo no puede superar 250 caracteres.';
     return next;
-  }, [idCliente, tipoAjuste, monto, fecha, idEmpleado, motivo, selectedDocumento]);
+  }, [idCliente, tipoAjuste, monto, fecha, motivo, selectedDocumento]);
 
   const isFormValid = !hasErrors(validationErrors) && !isLocked;
   const errorFor = (field: string, value = '') =>
@@ -127,7 +115,6 @@ export const AjusteForm = ({ ajuste, onSuccess, onCancel }: Props) => {
       monto: Number(monto),
       motivo: motivo.trim(),
       fecha,
-      idEmpleado: Number(idEmpleado),
     };
 
     try {
@@ -162,7 +149,7 @@ export const AjusteForm = ({ ajuste, onSuccess, onCancel }: Props) => {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Select
+        <SearchableSelect
           label="Cliente"
           required
           value={idCliente}
@@ -236,16 +223,6 @@ export const AjusteForm = ({ ajuste, onSuccess, onCancel }: Props) => {
           onChange={(e: any) => setFecha(e.target.value)}
           helperText="Fecha del ajuste; no puede ser futura."
           error={errorFor('fecha', fecha)}
-          isReadOnly={isLocked}
-        />
-        <Select
-          label="Empleado solicitante"
-          required
-          value={idEmpleado}
-          onChange={(e: any) => setIdEmpleado(e.target.value)}
-          options={empleados.map((e) => ({ value: e.id, label: e.label }))}
-          helperText="Empleado responsable de solicitar/registrar el ajuste."
-          error={errorFor('idEmpleado')}
           isReadOnly={isLocked}
         />
       </div>

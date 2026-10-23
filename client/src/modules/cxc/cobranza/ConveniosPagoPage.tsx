@@ -82,11 +82,11 @@ export const ConveniosPagoPage = () => {
 
       <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
         <TextInput
-          icon={Search}
+          icon={Search} maxLength={100}
           placeholder="Buscar por cliente o estado..."
           value={search}
           onChange={(e: any) => { setSearch(e.target.value); setPage(1); }}
-          className="max-w-sm"
+          className="max-w-md"
         />
       </div>
 

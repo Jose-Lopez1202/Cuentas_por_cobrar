@@ -13,6 +13,7 @@ import {
   type ValidationErrors,
 } from '../../../../shared/validation';
 import type { CatalogoOption, PromesaPago } from '@erp/contracts';
+import { SearchableSelect } from '../../../../shared/components/SearchableSelect';
 
 interface PromesaPagoFormProps { promesa?: PromesaPago | null; onSuccess: () => void; onCancel: () => void; }
 const ESTADOS_PROMESA_PAGO = ['PENDIENTE', 'CUMPLIDA', 'INCUMPLIDA'] as const;
@@ -69,7 +70,7 @@ export const PromesaPagoForm = ({ promesa, onSuccess, onCancel }: PromesaPagoFor
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
-      <Select label="Cliente" required value={idCliente} onChange={(e: any) => { setIdCliente(e.target.value); setIdDocumento(''); }} options={clientes.map((c) => ({ value: c.id, label: c.label }))} error={errors.idCliente} helperText="Cliente que realizó la promesa; campo obligatorio." />
+      <SearchableSelect label="Cliente" required value={idCliente} onChange={(e: any) => { setIdCliente(e.target.value); setIdDocumento(''); }} options={clientes.map((c) => ({ value: c.id, label: c.label }))} error={errors.idCliente} helperText="Cliente que realizó la promesa; campo obligatorio." />
       <Select label="Documento relacionado" value={idDocumento} onChange={(e: any) => setIdDocumento(e.target.value)} options={documentos.map((d) => ({ value: d.id, label: d.label }))} placeholder={idCliente ? 'Seleccionar documento (opcional)' : 'Selecciona un cliente primero'} isReadOnly={!idCliente} helperText="Opcional; solo aparecen documentos pendientes del cliente. Si se selecciona uno, el monto no puede superar su saldo." />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <TextInput label="Fecha de la promesa" type="date" required max={todayIso()} value={fechaPromesa} onChange={(e: any) => setFechaPromesa(e.target.value)} error={errors.fechaPromesa} helperText="Fecha en que se registró la promesa; no puede ser futura." />

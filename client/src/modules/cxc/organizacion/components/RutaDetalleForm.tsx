@@ -12,6 +12,7 @@ import {
   type ValidationErrors,
 } from '../../../../shared/validation';
 import type { CatalogoOption, RutaDetalle } from '@erp/contracts';
+import { SearchableSelect } from '../../../../shared/components/SearchableSelect';
 
 const ESTADOS_VISITA = ['PENDIENTE', 'VISITADO', 'NO_ENCONTRADO', 'REPROGRAMADO'] as const;
 const ESTADO_OPTIONS = ESTADOS_VISITA.map((e) => ({ value: e, label: e.replace(/_/g, ' ') }));
@@ -135,7 +136,7 @@ export const RutaDetalleForm = ({ idRuta, parada, onSuccess, onCancel }: RutaDet
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Select
+        <SearchableSelect
           label="Cliente"
           required
           value={idCliente}

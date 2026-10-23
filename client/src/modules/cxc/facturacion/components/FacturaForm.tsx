@@ -16,6 +16,7 @@ import {
   type ValidationErrors,
 } from '../../../../shared/validation';
 import type { DocumentoCatalogoOption, FacturaFelDetalle, ValidacionSat } from '@erp/contracts';
+import { SearchableSelect } from '../../../../shared/components/SearchableSelect';
 
 interface FacturaFormProps {
   onSuccess: (factura: FacturaFelDetalle) => void;
@@ -32,7 +33,6 @@ export const FacturaForm = ({ onSuccess, onCancel }: FacturaFormProps) => {
   const [clientes, setClientes] = useState<DocumentoCatalogoOption[]>([]);
   const [monedas, setMonedas] = useState<DocumentoCatalogoOption[]>([]);
   const [condiciones, setCondiciones] = useState<DocumentoCatalogoOption[]>([]);
-  const [empleados, setEmpleados] = useState<DocumentoCatalogoOption[]>([]);
 
   const [idCliente, setIdCliente] = useState('');
   const [nitReceptor, setNitReceptor] = useState('');
@@ -40,7 +40,6 @@ export const FacturaForm = ({ onSuccess, onCancel }: FacturaFormProps) => {
   const [idMoneda, setIdMoneda] = useState('');
   const [idCondicion, setIdCondicion] = useState('');
   const [fechaEmision, setFechaEmision] = useState(todayIso());
-  const [idEmpleado, setIdEmpleado] = useState('');
   const [lineas, setLineas] = useState<LineaState[]>([nuevaLinea()]);
 
   const [errors, setErrors] = useState<ValidationErrors>({});
@@ -54,9 +53,8 @@ export const FacturaForm = ({ onSuccess, onCancel }: FacturaFormProps) => {
       apiClient.get<DocumentoCatalogoOption[]>('/cxc/documentos/catalogos/clientes'),
       apiClient.get<DocumentoCatalogoOption[]>('/cxc/documentos/catalogos/monedas'),
       apiClient.get<DocumentoCatalogoOption[]>('/cxc/documentos/catalogos/condiciones-credito'),
-      apiClient.get<DocumentoCatalogoOption[]>('/cxc/documentos/catalogos/empleados'),
-    ]).then(([c, m, cc, e]) => {
-      setClientes(c); setMonedas(m); setCondiciones(cc); setEmpleados(e);
+    ]).then(([c, m, cc]) => {
+      setClientes(c); setMonedas(m); setCondiciones(cc);
       if (m.length === 1) setIdMoneda(String(m[0].id));
     }).catch(() => setFormError('No se pudieron cargar los catálogos. Cierra y vuelve a abrir el formulario.'));
   }, []);
@@ -86,7 +84,6 @@ export const FacturaForm = ({ onSuccess, onCancel }: FacturaFormProps) => {
     set('nombreReceptor', validateRequired(nombreReceptor, 'El nombre del receptor') ?? validateMaxLength(nombreReceptor, 'El nombre', 150));
     set('idMoneda', validateRequiredSelect(idMoneda, 'una moneda'));
     set('fechaEmision', validateRequiredDate(fechaEmision, 'La fecha de emisión', { notFuture: true }));
-    set('idEmpleado', validateRequiredSelect(idEmpleado, 'el empleado que emite'));
     lineas.forEach((l, i) => {
       const n = i + 1;
       set(`linea${i}.descripcion`, validateRequired(l.descripcion, `La descripción de la línea ${n}`) ?? validateMaxLength(l.descripcion, `La descripción de la línea ${n}`, 200));
@@ -94,7 +91,7 @@ export const FacturaForm = ({ onSuccess, onCancel }: FacturaFormProps) => {
       set(`linea${i}.precioUnitario`, validateMoney(l.precioUnitario, `El precio de la línea ${n}`, { required: true, positive: true }));
     });
     return next;
-  }, [idCliente, nitReceptor, nombreReceptor, idMoneda, fechaEmision, idEmpleado, lineas]);
+  }, [idCliente, nitReceptor, nombreReceptor, idMoneda, fechaEmision, lineas]);
 
   const isFormValid = !hasErrors(validation);
   const errorFor = (field: string, value: string) => errors[field] ?? (value ? validation[field] : undefined);
@@ -106,7 +103,6 @@ export const FacturaForm = ({ onSuccess, onCancel }: FacturaFormProps) => {
     idMoneda: Number(idMoneda),
     idCondicionCredito: idCondicion ? Number(idCondicion) : null,
     fechaEmision,
-    idEmpleado: Number(idEmpleado),
     lineas: lineas.map((l) => ({ descripcion: l.descripcion.trim(), cantidad: Number(l.cantidad), precioUnitario: Number(l.precioUnitario) })),
   });
 
@@ -152,13 +148,10 @@ export const FacturaForm = ({ onSuccess, onCancel }: FacturaFormProps) => {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Select label="Cliente" required value={idCliente} onChange={(e: any) => handleCliente(e.target.value)}
+      <div className="grid grid-cols-1 gap-4">
+        <SearchableSelect label="Cliente" required value={idCliente} onChange={(e: any) => handleCliente(e.target.value)}
           options={clientes.map((c) => ({ value: String(c.id), label: c.nit ? `${c.label} — NIT ${c.nit}` : c.label }))}
           error={errors.idCliente} helperText="Receptor de la factura; su NIT y nombre se cargan solos." />
-        <Select label="Empleado que emite" required value={idEmpleado} onChange={(e: any) => setIdEmpleado(e.target.value)}
-          options={empleados.map((x) => ({ value: String(x.id), label: x.label }))} error={errors.idEmpleado}
-          helperText="Queda registrado como emisor de la factura." />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

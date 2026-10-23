@@ -54,7 +54,7 @@ export const DocumentosPage = () => {
 
       <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
         <TextInput
-          icon={Search}
+          icon={Search} maxLength={100}
           placeholder="Buscar cliente, NIT, serie, número o estado..."
           value={search}
           onChange={(e: any) => { setSearch(e.target.value); setPage(1); }}
@@ -162,8 +162,6 @@ export const DocumentosPage = () => {
           description="El saldo pendiente del documento se llevará a cero. No se revierten los pagos/notas/anticipos ya aplicados a él."
           endpoint={`/cxc/documentos/${aAnular.idDocumento}/anular`}
           actionLabel="Anular"
-          empleadoLabel="Empleado que anula"
-          empleadoFieldName="idEmpleadoAnulacion"
           motivoLabel="Motivo de la anulación"
           motivoFieldName="motivoAnulacion"
           onClose={() => setAAnular(null)}

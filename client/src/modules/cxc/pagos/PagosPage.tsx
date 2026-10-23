@@ -52,7 +52,7 @@ export const PagosPage = () => {
 
       <div className="bg-white p-4 rounded-lg border border-slate-200">
         <TextInput
-          icon={Search}
+          icon={Search} maxLength={100}
           placeholder="Buscar cliente, referencia, estado o ID..."
           value={search}
           onChange={(e: any) => { setSearch(e.target.value); setPage(1); }}
@@ -139,8 +139,6 @@ export const PagosPage = () => {
           description="El pago quedará marcado como anulado de forma permanente. Solo se puede anular un pago sin aplicaciones vigentes."
           endpoint={`/cxc/pagos/${aAnular.idPago}/anular`}
           actionLabel="Anular"
-          empleadoLabel="Empleado que anula"
-          empleadoFieldName="idEmpleadoAnulacion"
           motivoLabel="Motivo de la anulación"
           motivoFieldName="motivoAnulacion"
           onClose={() => setAAnular(null)}

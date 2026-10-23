@@ -13,7 +13,7 @@ import { DataGrid } from '../analisis/ui/DataGrid';
 import { EstadoPill } from '../analisis/ui/Pills';
 import { useDetalle } from '../analisis/detalle/DetalleHost';
 
-const selectCls = 'h-9 w-full max-w-md rounded-md border border-slate-300 bg-white px-2.5 text-[13px] text-slate-800 outline-none hover:border-slate-400 focus:border-blue-700 focus:ring-2 focus:ring-blue-100';
+const selectCls = 'h-10 w-full max-w-md rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none hover:border-slate-400 focus:border-blue-700 focus:ring-2 focus:ring-blue-100';
 const hoy = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
 export const EstadoCuentaPage = () => {

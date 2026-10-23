@@ -13,6 +13,7 @@ import {
   type ValidationErrors,
 } from '../../../../shared/validation';
 import type { CatalogoOption, FormaPagoOption, Pago } from '@erp/contracts';
+import { SearchableSelect } from '../../../../shared/components/SearchableSelect';
 
 const REGISTRATION_STATES = [
   { value: 'NO_IDENTIFICADO', label: 'No identificado' },
@@ -184,7 +185,7 @@ export function PagoForm({
         </div>
       )}
 
-      <Select
+      <SearchableSelect
         label="Cliente"
         required
         value={idCliente}

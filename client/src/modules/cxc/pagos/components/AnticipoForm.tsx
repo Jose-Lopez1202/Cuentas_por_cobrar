@@ -11,6 +11,7 @@ import {
   type ValidationErrors,
 } from '../../../../shared/validation';
 import type { Anticipo, CatalogoOption } from '@erp/contracts';
+import { SearchableSelect } from '../../../../shared/components/SearchableSelect';
 
 export function AnticipoForm({
   item,
@@ -120,7 +121,7 @@ export function AnticipoForm({
           Este anticipo ya tiene aplicaciones o está anulado; su cabecera queda bloqueada para proteger la trazabilidad.
         </div>
       )}
-      <Select
+      <SearchableSelect
         label="Cliente"
         required
         value={idCliente}
