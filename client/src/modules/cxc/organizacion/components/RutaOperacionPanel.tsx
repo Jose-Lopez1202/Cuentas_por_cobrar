@@ -94,7 +94,7 @@ function AsignacionForm({ data, docs, empleados, onSubmit, onClose }: {
     validation.montoAsignado = `El monto asignado no puede superar lo disponible del documento (${doc.MONEDA} ${money(doc.DISPONIBLE)}).`;
   }
   const ordenErr = validateRequiredNumber(orden, 'El orden de visita', { integer: true, positive: true }); if (ordenErr) validation.ordenVisita = ordenErr;
-  const dirErr = validateRequired(direccion, 'La dirección') ?? validateMaxLength(direccion, 'La dirección', 250); if (dirErr) validation.direccion = dirErr;
+  const dirErr = validateRequired(direccion, 'La dirección') ?? validateMaxLength(direccion, 'La dirección', 200); if (dirErr) validation.direccion = dirErr;
   const latErr = validateRequiredNumber(latitud, 'La latitud', { min: -90, max: 90 }); if (latErr) validation.latitud = latErr;
   const lonErr = validateRequiredNumber(longitud, 'La longitud', { min: -180, max: 180 }); if (lonErr) validation.longitud = lonErr;
 
@@ -128,9 +128,9 @@ function AsignacionForm({ data, docs, empleados, onSubmit, onClose }: {
         onChange={(e: any) => setOrden(e.target.value)} error={f.errorFor('ordenVisita', orden)} placeholder="Ej. 1"
         helperText="Solo números enteros positivos." />
     </div>
-    <TextInput label="Dirección" required maxLength={250} value={direccion} onChange={(e: any) => setDireccion(e.target.value)}
+    <TextInput label="Dirección" required maxLength={200} value={direccion} onChange={(e: any) => setDireccion(e.target.value)}
       error={f.errorFor('direccion', direccion)} placeholder="Ej. 39 calle petapa 18-45"
-      helperText="Dirección de la visita; máximo 250 caracteres." />
+      helperText="Dirección de la visita; máximo 200 caracteres." />
     <div className="flex flex-col gap-1.5">
       <span className="text-xs font-semibold text-slate-700">Ubicación en el mapa</span>
       <RutaMap heightClass="h-56" pick={pick} onPick={(lat, lon) => { setLatitud(lat.toFixed(6)); setLongitud(lon.toFixed(6)); }} />
@@ -151,15 +151,14 @@ function AsignacionForm({ data, docs, empleados, onSubmit, onClose }: {
   </form>;
 }
 
-interface CobroPayload { idAsignacion: number; idPago: number; idEmpleado: number; monto: number; fecha: string }
+interface CobroPayload { idAsignacion: number; idPago: number; monto: number; fecha: string }
 
-function CobroForm({ data, pagos, empleados, onSubmit, onClose }: {
-  data?: RutaOperacion; pagos: RutaPagoDisponible[]; empleados: CatalogoOption[]; onClose: () => void;
+function CobroForm({ data, pagos, onSubmit, onClose }: {
+  data?: RutaOperacion; pagos: RutaPagoDisponible[]; onClose: () => void;
   onSubmit: (payload: CobroPayload) => Promise<void>;
 }) {
   const [idAsignacion, setIdAsignacion] = useState('');
   const [idPago, setIdPago] = useState('');
-  const [idEmpleado, setIdEmpleado] = useState('');
   const [monto, setMonto] = useState('');
   const [fecha, setFecha] = useState(todayIso());
 
@@ -176,7 +175,6 @@ function CobroForm({ data, pagos, empleados, onSubmit, onClose }: {
   } else {
     const pagoErr = validateRequiredSelect(idPago, 'un pago disponible'); if (pagoErr) validation.idPago = pagoErr;
   }
-  const empErr = validateRequiredSelect(idEmpleado, 'el empleado que registra'); if (empErr) validation.idEmpleado = empErr;
   const montoErr = validateMoney(monto, 'El monto a aplicar', { required: true, positive: true });
   if (montoErr) validation.monto = montoErr;
   else if (limite !== undefined && Number(monto) > limite) {
@@ -191,7 +189,7 @@ function CobroForm({ data, pagos, empleados, onSubmit, onClose }: {
 
   const reset = () => { setIdAsignacion(''); setIdPago(''); setMonto(''); setFecha(todayIso()); };
   const f = useRutaForm(
-    () => onSubmit({ idAsignacion: Number(idAsignacion), idPago: Number(idPago), idEmpleado: Number(idEmpleado), monto: Number(monto), fecha }),
+    () => onSubmit({ idAsignacion: Number(idAsignacion), idPago: Number(idPago), monto: Number(monto), fecha }),
     () => { reset(); onClose(); }, validation, 'No se pudo aplicar el cobro',
   );
 
@@ -209,8 +207,6 @@ function CobroForm({ data, pagos, empleados, onSubmit, onClose }: {
         options={pagosCliente.map((p) => ({ value: String(p.ID_PAGO), label: `${p.REFERENCIA} · ${p.MONEDA} ${money(p.DISPONIBLE)}` }))}
         error={f.errors.idPago ?? (cobro && pagosCliente.length === 0 ? validation.idPago : undefined)}
         helperText={cobro ? 'Pagos del mismo cliente y moneda con monto disponible.' : 'Selecciona primero el documento asignado.'} />
-      <Select label="Empleado que registra" required value={idEmpleado} onChange={(e: any) => setIdEmpleado(e.target.value)}
-        options={toOptions(empleados)} error={f.errors.idEmpleado} helperText="Queda como responsable en el historial y el recibo." />
     </div>
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <TextInput label="Monto a aplicar" type="number" restriction="decimal" decimalPlaces={2} step="0.01" min="0.01" required
@@ -403,7 +399,7 @@ export function RutaOperacionPanel({ idRuta, estado }: { idRuta: number; estado:
     </Modal>}
     {modal === 'cobro' && <Modal isOpen onClose={closeModal} title="Aplicar cobro" description="Aplica un pago ya registrado a un documento de la ruta; reduce su saldo y genera el recibo." size="md" closeOnBackdrop={false}>
       <p className="text-sm text-slate-600 mb-4">Primero registra el dinero recibido en <Link className="text-blue-700 underline" to="/cxc/pagos/pagos" target="_blank">Pagos</Link> y pulsa Actualizar. Para corregir un cobro usa la reversa en <Link className="text-blue-700 underline" to="/cxc/pagos/aplicaciones-pago" target="_blank">Aplicaciones de pago</Link>.</p>
-      <CobroForm data={data} pagos={pagos} empleados={empleados} onClose={closeModal}
+      <CobroForm data={data} pagos={pagos} onClose={closeModal}
         onSubmit={(payload) => perform(async () => {
           const fingerprint = JSON.stringify(payload);
           if (pendingOperation.current?.fingerprint !== fingerprint) pendingOperation.current = { fingerprint, clave: crypto.randomUUID() };

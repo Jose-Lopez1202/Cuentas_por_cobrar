@@ -1,14 +1,14 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useMemo, useState, type FormEvent } from 'react';
 import { Plus, Pencil, Trash2, Search, Check, X as XIcon } from 'lucide-react';
-import { DataTable, StatusBadge, Button, TextInput, Select, TextArea } from '../../../shared/ui-kit';
+import { DataTable, StatusBadge, Button, TextInput, TextArea } from '../../../shared/ui-kit';
 import { Modal } from '../../../shared/components';
 import { ConfirmDialog } from '../../../shared/components/ConfirmDialog';
 import { FormActionButtons } from '../../../shared/components/FormActionButtons';
 import { usePaginatedList } from '../../../shared/hooks';
 import { apiClient, ApiError } from '../../../shared/api';
 import { formatDateGT } from '../../../shared/date';
-import { hasErrors, validateRequiredSelect, validateMaxLength, type ValidationErrors } from '../../../shared/validation';
-import type { Ajuste, DocumentoCatalogoOption } from '@erp/contracts';
+import { hasErrors, validateMaxLength, type ValidationErrors } from '../../../shared/validation';
+import type { Ajuste } from '@erp/contracts';
 import { AjusteForm } from './components/AjusteForm';
 
 const PAGE_SIZE = 10;
@@ -24,30 +24,15 @@ function AprobacionModal({
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const [empleados, setEmpleados] = useState<DocumentoCatalogoOption[]>([]);
-  const [idEmpleadoAprobador, setIdEmpleadoAprobador] = useState('');
   const [motivoRechazo, setMotivoRechazo] = useState('');
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    apiClient
-      .get<DocumentoCatalogoOption[]>('/cxc/documentos/catalogos/empleados')
-      .then(setEmpleados)
-      .catch(() => setEmpleados([]));
-  }, []);
-
   const esSegundaAprobacion = accion === 'aprobar' && ajuste.estado === 'EN_2DA_APROBACION';
 
   const validationErrors = useMemo<ValidationErrors>(() => {
     const next: ValidationErrors = {};
-    const empleadoErr = validateRequiredSelect(idEmpleadoAprobador, `un empleado que ${accion}`);
-    if (empleadoErr) next.idEmpleadoAprobador = empleadoErr;
-    else if (esSegundaAprobacion && Number(idEmpleadoAprobador) === ajuste.idEmpleadoAprobador) {
-      next.idEmpleadoAprobador = 'Debe ser un empleado distinto al que dio la primera aprobación.';
-    }
-
     if (accion === 'rechazar') {
       if (motivoRechazo.trim().length < 5) next.motivoRechazo = 'Describe el motivo del rechazo (mínimo 5 caracteres).';
       else {
@@ -56,7 +41,7 @@ function AprobacionModal({
       }
     }
     return next;
-  }, [idEmpleadoAprobador, motivoRechazo, accion, esSegundaAprobacion, ajuste.idEmpleadoAprobador]);
+  }, [motivoRechazo, accion]);
 
   const isFormValid = !hasErrors(validationErrors);
 
@@ -70,10 +55,7 @@ function AprobacionModal({
     setFormError(null);
     setBusy(true);
     try {
-      const payload =
-        accion === 'aprobar'
-          ? { idEmpleadoAprobador: Number(idEmpleadoAprobador) }
-          : { idEmpleadoAprobador: Number(idEmpleadoAprobador), motivoRechazo: motivoRechazo.trim() };
+      const payload = accion === 'aprobar' ? {} : { motivoRechazo: motivoRechazo.trim() };
       await apiClient.post(`/cxc/ajustes/${ajuste.idAjuste}/${accion}`, payload);
       onSuccess();
     } catch (err) {
@@ -104,16 +86,6 @@ function AprobacionModal({
       size="sm"
     >
       <form onSubmit={submit} className="flex flex-col gap-4">
-        <Select
-          label={accion === 'aprobar' ? 'Empleado que aprueba' : 'Empleado que rechaza'}
-          required
-          value={idEmpleadoAprobador}
-          onChange={(e: any) => setIdEmpleadoAprobador(e.target.value)}
-          options={empleados.map((e) => ({ value: e.id, label: e.label }))}
-          error={errors.idEmpleadoAprobador}
-          helperText={esSegundaAprobacion ? 'Debe ser distinto al empleado que dio la primera aprobación.' : undefined}
-        />
-
         {accion === 'rechazar' && (
           <TextArea
             label="Motivo del rechazo"
@@ -184,7 +156,7 @@ export const AjustesPage = () => {
 
       <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
         <TextInput
-          icon={Search}
+          icon={Search} maxLength={100}
           placeholder="Buscar cliente, tipo, motivo, estado o documento..."
           value={search}
           onChange={(e: any) => { setSearch(e.target.value); setPage(1); }}

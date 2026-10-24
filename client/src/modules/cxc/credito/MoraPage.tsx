@@ -124,14 +124,14 @@ export const MoraPage = () => {
 
       <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
         <TextInput
-          icon={Search}
-          placeholder="Buscar registro de mora..."
+          icon={Search} maxLength={100}
+          placeholder="Buscar cliente, documento, estado o días de mora..."
           value={search}
           onChange={(e: any) => {
             setSearch(e.target.value);
             setPage(1);
           }}
-          className="max-w-sm"
+          className="max-w-md"
         />
       </div>
 

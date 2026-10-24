@@ -16,7 +16,7 @@ export const rutaSchema = z.object({
 export type Ruta = z.infer<typeof rutaSchema>;
 
 export const createRutaSchema = z.object({
-  codigoRuta: identifierSchema('El código de ruta', 30).optional(),
+  codigoRuta: identifierSchema('El código de ruta', 20).optional(),
   nombre: soloLetrasSchema('El nombre', 120),
   idEmpleado: z.number().int().positive('Selecciona un empleado responsable'),
   fecha: optionalIsoDateSchema('La fecha'),

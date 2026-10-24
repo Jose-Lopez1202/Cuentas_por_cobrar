@@ -89,7 +89,10 @@ export async function findAll(params: { page: number; limit: number; search?: st
     const whereClause = params.search
       ? `WHERE TO_CHAR(ID_APLICACION_ANTICIPO) LIKE :search
           OR TO_CHAR(ID_ANTICIPO) LIKE :search
-          OR TO_CHAR(ID_DOCUMENTO) LIKE :search`
+          OR TO_CHAR(ID_DOCUMENTO) LIKE :search
+          OR ID_DOCUMENTO IN (SELECT dx.ID_DOCUMENTO FROM CXC_DOCUMENTOS dx LEFT JOIN CLIENTE cx ON cx.ID_CLIENTE = dx.ID_CLIENTE
+            WHERE UPPER(NVL(cx.NOMBRE, '')) LIKE UPPER(:search)
+               OR UPPER(NVL(dx.SERIE, '') || '-' || NVL(TO_CHAR(dx.NUMERO_DOCUMENTO), '')) LIKE UPPER(:search))`
       : '';
     const searchBind = params.search ? { search: `%${params.search}%` } : {};
 

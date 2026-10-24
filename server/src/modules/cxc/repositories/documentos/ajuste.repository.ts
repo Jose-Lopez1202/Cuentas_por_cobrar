@@ -96,7 +96,10 @@ export async function findAll(params: {
           OR UPPER(a.TIPO_AJUSTE) LIKE UPPER(:search)
           OR UPPER(a.MOTIVO) LIKE UPPER(:search)
           OR UPPER(a.ESTADO) LIKE UPPER(:search)
-          OR TO_CHAR(a.ID_DOCUMENTO) LIKE :search`
+          OR TO_CHAR(a.ID_DOCUMENTO) LIKE :search
+          OR a.ID_DOCUMENTO IN (SELECT dx.ID_DOCUMENTO FROM CXC_DOCUMENTOS dx LEFT JOIN CLIENTE cx ON cx.ID_CLIENTE = dx.ID_CLIENTE
+            WHERE UPPER(NVL(cx.NOMBRE, '')) LIKE UPPER(:search)
+               OR UPPER(NVL(dx.SERIE, '') || '-' || NVL(TO_CHAR(dx.NUMERO_DOCUMENTO), '')) LIKE UPPER(:search))`
       : '';
     const searchBind = params.search ? { search: `%${params.search}%` } : {};
 

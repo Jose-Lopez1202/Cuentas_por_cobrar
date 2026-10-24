@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as service from '../../services/facturacion/factura.service';
+import { conEmpleadoActual } from '../../../auth/empleadoActual';
 
 export async function list(req: Request, res: Response, next: NextFunction) {
   try {
@@ -20,9 +21,9 @@ export async function validar(req: Request, res: Response, next: NextFunction) {
 }
 
 export async function emitir(req: Request, res: Response, next: NextFunction) {
-  try { res.status(201).json(await service.emitirFactura(req.body)); } catch (err) { next(err); }
+  try { res.status(201).json(await service.emitirFactura(await conEmpleadoActual(req))); } catch (err) { next(err); }
 }
 
 export async function anular(req: Request, res: Response, next: NextFunction) {
-  try { res.json(await service.anularFactura(Number(req.params.id), req.body)); } catch (err) { next(err); }
+  try { res.json(await service.anularFactura(Number(req.params.id), await conEmpleadoActual(req, 'idEmpleadoAnulacion'))); } catch (err) { next(err); }
 }

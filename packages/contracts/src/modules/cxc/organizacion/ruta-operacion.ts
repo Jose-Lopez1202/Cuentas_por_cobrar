@@ -3,7 +3,7 @@ import { moneySchema, isoDateSchema } from '../validation';
 const id = z.number().int().positive();
 export const asignarDocumentoRutaSchema = z.object({
   idDocumento: id, idEmpleado: id, montoAsignado: moneySchema('Monto asignado', true),
-  direccion: z.string().trim().min(1).max(250), ordenVisita: id,
+  direccion: z.string().trim().min(1).max(200), ordenVisita: id,
   latitud: z.number().min(-90).max(90), longitud: z.number().min(-180).max(180),
 });
 export const registrarBitacoraRutaSchema = z.object({

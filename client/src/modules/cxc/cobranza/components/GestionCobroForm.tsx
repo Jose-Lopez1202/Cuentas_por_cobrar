@@ -12,6 +12,7 @@ import {
   type ValidationErrors,
 } from '../../../../shared/validation';
 import type { CatalogoOption, GestionCobro } from '@erp/contracts';
+import { SearchableSelect } from '../../../../shared/components/SearchableSelect';
 
 interface GestionCobroFormProps {
   gestion?: GestionCobro | null;
@@ -25,10 +26,8 @@ const TIPO_OPTIONS = TIPOS_GESTION_COBRO.map((t) => ({ value: t, label: t }));
 export const GestionCobroForm = ({ gestion, onSuccess, onCancel }: GestionCobroFormProps) => {
   const isEditing = !!gestion;
   const [clientes, setClientes] = useState<CatalogoOption[]>([]);
-  const [empleados, setEmpleados] = useState<CatalogoOption[]>([]);
   const [documentos, setDocumentos] = useState<CatalogoOption[]>([]);
   const [idCliente, setIdCliente] = useState(gestion?.idCliente?.toString() ?? '');
-  const [idEmpleado, setIdEmpleado] = useState(gestion?.idEmpleado?.toString() ?? '');
   const [idDocumento, setIdDocumento] = useState(gestion?.idDocumento?.toString() ?? '');
   const [tipoGestion, setTipoGestion] = useState(gestion?.tipoGestion ?? '');
   const [resultado, setResultado] = useState(gestion?.resultado ?? '');
@@ -41,7 +40,6 @@ export const GestionCobroForm = ({ gestion, onSuccess, onCancel }: GestionCobroF
 
   useEffect(() => {
     apiClient.get<CatalogoOption[]>('/cxc/catalogos/clientes').then(setClientes).catch(() => setClientes([]));
-    apiClient.get<CatalogoOption[]>('/cxc/catalogos/empleados').then(setEmpleados).catch(() => setEmpleados([]));
   }, []);
 
   useEffect(() => {
@@ -54,8 +52,6 @@ export const GestionCobroForm = ({ gestion, onSuccess, onCancel }: GestionCobroF
     const next: ValidationErrors = {};
     const clienteErr = validateRequiredSelect(idCliente, 'un cliente');
     if (clienteErr) next.idCliente = clienteErr;
-    const empleadoErr = validateRequiredSelect(idEmpleado, 'un empleado responsable');
-    if (empleadoErr) next.idEmpleado = empleadoErr;
     const resultadoErr = validateMaxLength(resultado, 'Resultado', 80);
     if (resultadoErr) next.resultado = resultadoErr;
     const observacionErr = validateMaxLength(observacion, 'Observación', 500);
@@ -65,7 +61,7 @@ export const GestionCobroForm = ({ gestion, onSuccess, onCancel }: GestionCobroF
     const montoErr = validateMoney(montoCompromiso, 'El monto comprometido', { positive: true });
     if (montoErr) next.montoCompromiso = montoErr;
     return next;
-  }, [idCliente, idEmpleado, resultado, observacion, fechaCompromiso, montoCompromiso]);
+  }, [idCliente, resultado, observacion, fechaCompromiso, montoCompromiso]);
 
   const isFormValid = !hasErrors(validationErrors);
 
@@ -77,7 +73,6 @@ export const GestionCobroForm = ({ gestion, onSuccess, onCancel }: GestionCobroF
     setIsSubmitting(true);
     const payload = {
       idCliente: Number(idCliente),
-      idEmpleado: Number(idEmpleado),
       idDocumento: idDocumento ? Number(idDocumento) : undefined,
       tipoGestion: tipoGestion || undefined,
       resultado: resultado.trim() || undefined,
@@ -100,9 +95,8 @@ export const GestionCobroForm = ({ gestion, onSuccess, onCancel }: GestionCobroF
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Select label="Cliente" required value={idCliente} onChange={(e: any) => { setIdCliente(e.target.value); setIdDocumento(''); }} options={clientes.map((c) => ({ value: c.id, label: c.label }))} error={errors.idCliente} helperText="Cliente al que se realizó la gestión; campo obligatorio." />
-        <Select label="Empleado responsable" required value={idEmpleado} onChange={(e: any) => setIdEmpleado(e.target.value)} options={empleados.map((emp) => ({ value: emp.id, label: emp.label }))} error={errors.idEmpleado} helperText="Persona responsable del contacto con el cliente." />
+      <div className="grid grid-cols-1 gap-4">
+        <SearchableSelect label="Cliente" required value={idCliente} onChange={(e: any) => { setIdCliente(e.target.value); setIdDocumento(''); }} options={clientes.map((c) => ({ value: c.id, label: c.label }))} error={errors.idCliente} helperText="Cliente al que se realizó la gestión; campo obligatorio." />
       </div>
       <Select label="Documento relacionado" value={idDocumento} onChange={(e: any) => setIdDocumento(e.target.value)} options={documentos.map((d) => ({ value: d.id, label: d.label }))} placeholder={idCliente ? 'Seleccionar documento (opcional)' : 'Selecciona un cliente primero'} isReadOnly={!idCliente} helperText="Opcional; solo aparecen documentos con saldo pendiente del cliente seleccionado." />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -16,8 +16,8 @@ interface Props {
   nota?: string;
 }
 
-const selectCls = 'h-8 max-w-[190px] rounded border border-slate-300 bg-white pl-8 pr-2 text-[13px] text-slate-800 outline-none hover:border-slate-400 focus:border-blue-700 focus:ring-2 focus:ring-blue-100';
-const dateCls = 'h-8 rounded border border-slate-300 bg-white px-2 text-[13px] text-slate-800 outline-none hover:border-slate-400 focus:border-blue-700 focus:ring-2 focus:ring-blue-100';
+const selectCls = 'h-10 max-w-[220px] rounded-md border border-slate-300 bg-white pl-8 pr-2 text-sm text-slate-800 outline-none hover:border-slate-400 focus:border-blue-700 focus:ring-2 focus:ring-blue-100';
+const dateCls = 'h-10 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none hover:border-slate-400 focus:border-blue-700 focus:ring-2 focus:ring-blue-100';
 
 /** Barra de segmentadores (slicers) fija bajo el encabezado, como en un tablero de BI. */
 export function FilterBar({ filtros, onChange, onLimpiar, mostrarLimpiar, cobrador = true, ruta = true, nota }: Props) {

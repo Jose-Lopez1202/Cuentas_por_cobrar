@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as ajusteService from '../../services/documentos/ajuste.service';
+import { conEmpleadoActual } from '../../../auth/empleadoActual';
 
 export async function list(req: Request, res: Response, next: NextFunction) {
   try {
@@ -23,7 +24,7 @@ export async function getOne(req: Request, res: Response, next: NextFunction) {
 
 export async function create(req: Request, res: Response, next: NextFunction) {
   try {
-    res.status(201).json(await ajusteService.createAjuste(req.body));
+    res.status(201).json(await ajusteService.createAjuste(await conEmpleadoActual(req)));
   } catch (err) {
     next(err);
   }
@@ -48,7 +49,7 @@ export async function remove(req: Request, res: Response, next: NextFunction) {
 
 export async function aprobar(req: Request, res: Response, next: NextFunction) {
   try {
-    res.json(await ajusteService.aprobarAjuste(Number(req.params.id), req.body));
+    res.json(await ajusteService.aprobarAjuste(Number(req.params.id), await conEmpleadoActual(req, 'idEmpleadoAprobador')));
   } catch (err) {
     next(err);
   }
@@ -56,7 +57,7 @@ export async function aprobar(req: Request, res: Response, next: NextFunction) {
 
 export async function rechazar(req: Request, res: Response, next: NextFunction) {
   try {
-    res.json(await ajusteService.rechazarAjuste(Number(req.params.id), req.body));
+    res.json(await ajusteService.rechazarAjuste(Number(req.params.id), await conEmpleadoActual(req, 'idEmpleadoAprobador')));
   } catch (err) {
     next(err);
   }

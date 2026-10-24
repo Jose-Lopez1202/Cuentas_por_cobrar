@@ -68,6 +68,9 @@ export async function findAll(params: {
            OR TO_CHAR(PORCENTAJE_MORA) LIKE :search
            OR TO_CHAR(MONTO_MORA) LIKE :search
            OR UPPER(ESTADO) LIKE UPPER(:search)
+           OR ID_DOCUMENTO IN (SELECT dx.ID_DOCUMENTO FROM CXC_DOCUMENTOS dx LEFT JOIN CLIENTE cx ON cx.ID_CLIENTE = dx.ID_CLIENTE
+             WHERE UPPER(NVL(cx.NOMBRE, '')) LIKE UPPER(:search)
+                OR UPPER(NVL(dx.SERIE, '') || '-' || NVL(TO_CHAR(dx.NUMERO_DOCUMENTO), '')) LIKE UPPER(:search))
       `
       : '';
 

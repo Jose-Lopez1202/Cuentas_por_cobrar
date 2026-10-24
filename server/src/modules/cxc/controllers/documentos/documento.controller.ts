@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as documentoService from '../../services/documentos/documento.service';
+import { conEmpleadoActual } from '../../../auth/empleadoActual';
 
 export async function list(req: Request, res: Response, next: NextFunction) {
   try {
@@ -49,7 +50,7 @@ export async function remove(req: Request, res: Response, next: NextFunction) {
 
 export async function anular(req: Request, res: Response, next: NextFunction) {
   try {
-    res.json(await documentoService.anularDocumento(Number(req.params.id), req.body));
+    res.json(await documentoService.anularDocumento(Number(req.params.id), await conEmpleadoActual(req, 'idEmpleadoAnulacion')));
   } catch (err) {
     next(err);
   }

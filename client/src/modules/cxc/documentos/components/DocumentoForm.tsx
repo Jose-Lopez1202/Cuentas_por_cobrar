@@ -15,6 +15,7 @@ import {
   type ValidationErrors,
 } from '../../../../shared/validation';
 import type { Documento, DocumentoCatalogoOption } from '@erp/contracts';
+import { SearchableSelect } from '../../../../shared/components/SearchableSelect';
 
 interface Props {
   documento?: Documento | null;
@@ -202,7 +203,7 @@ export const DocumentoForm = ({ documento, onSuccess, onCancel }: Props) => {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Select
+        <SearchableSelect
           label="Cliente"
           required
           value={idCliente}

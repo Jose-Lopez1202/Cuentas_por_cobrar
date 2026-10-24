@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import * as service from '../../services/credito/notaCredito.service';
+import { conEmpleadoActual } from '../../../auth/empleadoActual';
 
 export async function list(req: Request, res: Response, next: NextFunction) {
   try {
@@ -28,5 +29,5 @@ export async function remove(req: Request, res: Response, next: NextFunction) {
 }
 
 export async function anular(req: Request, res: Response, next: NextFunction) {
-  try { res.json(await service.anular(Number(req.params.id), req.body)); } catch (error) { next(error); }
+  try { res.json(await service.anular(Number(req.params.id), await conEmpleadoActual(req, 'idEmpleadoAnulacion'))); } catch (error) { next(error); }
 }
