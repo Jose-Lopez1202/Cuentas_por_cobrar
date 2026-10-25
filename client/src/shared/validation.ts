@@ -216,6 +216,24 @@ export function validateLettersOnly(
   return undefined;
 }
 
+// Solo letras (incluye tildes, ñ, ü) y espacios. Sin números ni signos.
+export const SOLO_LETRAS_REGEX = /^[\p{L}\s]+$/u;
+
+export function sanitizeSoloLetras(value: string): string {
+  return value.replace(/[^\p{L}\s]/gu, '');
+}
+
+export function validateSoloLetras(
+  value: string | undefined | null,
+  fieldLabel: string,
+): string | undefined {
+  if (isBlank(value)) return undefined;
+  if (!SOLO_LETRAS_REGEX.test((value as string).trim())) {
+    return `${fieldLabel} solo admite letras y espacios, sin números ni signos.`;
+  }
+  return undefined;
+}
+
 export function validateAlphanumericCode(
   value: string | undefined | null,
   fieldLabel: string,

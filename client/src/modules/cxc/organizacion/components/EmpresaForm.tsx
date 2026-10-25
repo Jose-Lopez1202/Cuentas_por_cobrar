@@ -4,9 +4,11 @@ import { FormActionButtons } from '../../../../shared/components/FormActionButto
 import { apiClient, ApiError } from '../../../../shared/api';
 import {
   hasErrors,
+  sanitizeSoloLetras,
   validateGuatemalaNit,
   validateMaxLength,
   validateRequired,
+  validateSoloLetras,
   type ValidationErrors,
 } from '../../../../shared/validation';
 import type { Empresa } from '@erp/contracts';
@@ -37,6 +39,8 @@ export const EmpresaForm = ({ empresa, onSuccess, onCancel }: EmpresaFormProps) 
     if (nombreReq) next.nombre = nombreReq;
     const nombreMax = validateMaxLength(nombre, 'El nombre', 150);
     if (nombreMax) next.nombre = nombreMax;
+    const nombreLetras = validateSoloLetras(nombre, 'El nombre');
+    if (nombreLetras) next.nombre = nombreLetras;
     if (nit) {
       const nitErr = validateGuatemalaNit(nit, 'El NIT');
       if (nitErr) next.nit = nitErr;
@@ -88,10 +92,10 @@ export const EmpresaForm = ({ empresa, onSuccess, onCancel }: EmpresaFormProps) 
         required
         maxLength={150}
         value={nombre}
-        onChange={(e: any) => setNombre(e.target.value)}
+        onChange={(e: any) => setNombre(sanitizeSoloLetras(e.target.value))}
         error={errors.nombre ?? (nombre ? validationErrors.nombre : undefined)}
-        helperText="Razón social o nombre comercial; máximo 150 caracteres."
-        placeholder="Ej. Distribuidora Central, S.A."
+        helperText="Solo letras y espacios, sin números ni signos; máximo 150 caracteres."
+        placeholder="Ej. Distribuidora Central"
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { TextInput, Select } from '../../../../shared/ui-kit';
 import { FormActionButtons } from '../../../../shared/components/FormActionButtons';
 import { apiClient, ApiError } from '../../../../shared/api';
@@ -9,7 +9,7 @@ import {
   validateRequiredSelect,
   type ValidationErrors,
 } from '../../../../shared/validation';
-import type { DocumentoHistorial, DocumentoCatalogoOption } from '@erp/contracts';
+import type { DocumentoHistorial } from '@erp/contracts';
 
 const ESTADOS_DOCUMENTO = ['PENDIENTE', 'PARCIAL', 'PAGADO', 'VENCIDO', 'ANULADO'] as const;
 const estadoOptions = ESTADOS_DOCUMENTO.map((value) => ({
@@ -33,21 +33,12 @@ export const DocumentoHistorialForm = ({
   onCancel,
 }: Props) => {
   const isEditing = Boolean(historial);
-  const [empleados, setEmpleados] = useState<DocumentoCatalogoOption[]>([]);
   const estadoAnterior = historial?.estadoAnterior ?? currentEstado;
   const [estadoNuevo, setEstadoNuevo] = useState(historial?.estadoNuevo ?? '');
   const [fecha, setFecha] = useState(historial?.fecha?.slice(0, 10) ?? todayIso());
-  const [idEmpleado, setIdEmpleado] = useState(historial?.idEmpleado?.toString() ?? '');
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    apiClient
-      .get<DocumentoCatalogoOption[]>('/cxc/documentos/catalogos/empleados')
-      .then(setEmpleados)
-      .catch(() => setEmpleados([]));
-  }, []);
 
   const validationErrors = useMemo<ValidationErrors>(() => {
     const next: ValidationErrors = {};
@@ -63,11 +54,9 @@ export const DocumentoHistorialForm = ({
     });
     if (fechaErr) next.fecha = fechaErr;
 
-    const empleadoErr = validateRequiredSelect(idEmpleado, 'un empleado');
-    if (empleadoErr) next.idEmpleado = empleadoErr;
 
     return next;
-  }, [estadoNuevo, estadoAnterior, fecha, idEmpleado, isEditing]);
+  }, [estadoNuevo, estadoAnterior, fecha, isEditing]);
 
   const isFormValid = !hasErrors(validationErrors);
   const errorFor = (field: string, value = '') =>
@@ -87,7 +76,6 @@ export const DocumentoHistorialForm = ({
       estadoAnterior: estadoAnterior || undefined,
       estadoNuevo,
       fecha,
-      idEmpleado: Number(idEmpleado),
     };
 
     try {
@@ -142,15 +130,6 @@ export const DocumentoHistorialForm = ({
           onChange={(e: any) => setFecha(e.target.value)}
           helperText="Fecha del cambio; no puede ser futura."
           error={errorFor('fecha', fecha)}
-        />
-        <Select
-          label="Empleado"
-          required
-          value={idEmpleado}
-          onChange={(e: any) => setIdEmpleado(e.target.value)}
-          options={empleados.map((e) => ({ value: e.id, label: e.label }))}
-          helperText="Empleado que registra el cambio de estado."
-          error={errorFor('idEmpleado')}
         />
       </div>
 

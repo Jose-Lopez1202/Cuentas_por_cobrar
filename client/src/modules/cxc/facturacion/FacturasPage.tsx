@@ -59,7 +59,7 @@ export const FacturasPage = () => {
       </div>
 
       <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
-        <TextInput icon={Search} placeholder="Buscar cliente, NIT, serie, número, UUID o estado..." value={search}
+        <TextInput icon={Search} maxLength={100} placeholder="Buscar cliente, NIT, serie, número, UUID o estado..." value={search}
           onChange={(e: any) => { setSearch(e.target.value); setPage(1); }} className="max-w-md" />
       </div>
 
@@ -165,8 +165,6 @@ export const FacturasPage = () => {
           description="Se anula el DTE ante la SAT simulada, el documento por cobrar queda anulado y el saldo en cero."
           endpoint={`/cxc/facturas/${aAnular.idFacturaFel}/anular`}
           actionLabel="Anular factura"
-          empleadoLabel="Empleado que anula"
-          empleadoFieldName="idEmpleadoAnulacion"
           motivoLabel="Motivo de la anulación"
           motivoFieldName="motivoAnulacion"
           onClose={() => setAAnular(null)}

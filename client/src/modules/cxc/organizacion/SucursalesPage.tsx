@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, MapPin } from 'lucide-react';
+import { Plus, Pencil, Trash2, MapPin, Search } from 'lucide-react';
 import { DataTable, StatusBadge, Button, TextInput } from '../../../shared/ui-kit';
 import { Modal } from '../../../shared/components';
 import { ConfirmDialog } from '../../../shared/components/ConfirmDialog';
@@ -52,11 +52,11 @@ export const SucursalesPage = () => {
 
       <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
         <TextInput
-          icon={MapPin}
+          icon={Search} maxLength={100}
           placeholder="Buscar por sucursal o empresa..."
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          className="max-w-sm"
+          className="max-w-md"
         />
       </div>
 

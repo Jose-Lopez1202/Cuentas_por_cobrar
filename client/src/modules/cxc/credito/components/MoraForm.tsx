@@ -13,6 +13,7 @@ import {
   type ValidationErrors,
 } from '../../../../shared/validation';
 import type { CatalogoOption, Mora } from '@erp/contracts';
+import { SearchableSelect } from '../../../../shared/components/SearchableSelect';
 
 const ESTADO_OPTIONS = [
   { value: 'ACTIVA', label: 'Activa' },
@@ -66,7 +67,7 @@ export const MoraForm = ({ mora, onSuccess, onCancel }: MoraFormProps) => {
   };
 
   return <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-    {!isEditing && <Select label="Cliente" required value={idCliente} onChange={(e:any)=>{setIdCliente(e.target.value);setIdDocumento('');}} options={clientes.map(c=>({value:c.id,label:c.label}))} placeholder="Seleccionar cliente" error={errors.idCliente} helperText="Primero selecciona el cliente para mostrar únicamente sus documentos pendientes." />}
+    {!isEditing && <SearchableSelect label="Cliente" required value={idCliente} onChange={(e:any)=>{setIdCliente(e.target.value);setIdDocumento('');}} options={clientes.map(c=>({value:c.id,label:c.label}))} placeholder="Seleccionar cliente" error={errors.idCliente} helperText="Primero selecciona el cliente para mostrar únicamente sus documentos pendientes." />}
     {isEditing ? <TextInput label="Documento" value={idDocumento} isReadOnly helperText="El documento asociado no se cambia durante la edición de la mora." /> : <Select label="Documento" required value={idDocumento} onChange={(e:any)=>setIdDocumento(e.target.value)} options={documentos.map(d=>({value:d.id,label:d.label}))} placeholder={idCliente?'Seleccionar documento':'Selecciona un cliente primero'} isReadOnly={!idCliente} error={errors.idDocumento} helperText="Documento con saldo pendiente al que corresponde la mora." />}
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <TextInput label="Días de mora" type="number" restriction="integer" min="0" max="36500" value={diasMora} onChange={(e:any)=>setDiasMora(e.target.value)} error={errors.diasMora} placeholder="0" helperText="Solo enteros no negativos." />

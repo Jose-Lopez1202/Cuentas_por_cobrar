@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as gestionCobroService from '../../services/cobranza/gestionCobro.service';
+import { conEmpleadoActual } from '../../../auth/empleadoActual';
 
 export async function list(req: Request, res: Response, next: NextFunction) {
   try {
@@ -25,7 +26,7 @@ export async function getOne(req: Request, res: Response, next: NextFunction) {
 
 export async function create(req: Request, res: Response, next: NextFunction) {
   try {
-    const gestion = await gestionCobroService.createGestion(req.body);
+    const gestion = await gestionCobroService.createGestion(await conEmpleadoActual(req));
     res.status(201).json(gestion);
   } catch (err) {
     next(err);

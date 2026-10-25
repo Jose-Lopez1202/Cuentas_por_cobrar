@@ -23,6 +23,7 @@ import {
 } from '../components/ui/FormControls';
 import { AuditBanner as AuditBannerBase } from '../components/ui/Badges';
 import { UnifiedStatusBadge } from './components/UnifiedStatusBadge';
+import { AutoSearchSelect } from './components/AutoSearchSelect';
 import {
   Sidebar as SidebarBase,
   Navbar as NavbarBase,
@@ -37,7 +38,7 @@ import {
 
 export const Button = ButtonBase as FC<any>;
 export const TextInput = TextInputBase as FC<any>;
-export const Select = SelectBase as FC<any>;
+export const Select = AutoSearchSelect as FC<any>;
 export const TextArea = TextAreaBase as FC<any>;
 export const Checkbox = CheckboxBase as FC<any>;
 export const StatusBadge = UnifiedStatusBadge as FC<any>;

@@ -24,29 +24,18 @@ export function AplicacionPagoForm({
   const isEditing = Boolean(item);
   const [pagos, setPagos] = useState<CatalogoOption[]>([]);
   const [documentos, setDocumentos] = useState<CatalogoOption[]>([]);
-  const [empleados, setEmpleados] = useState<CatalogoOption[]>([]);
   const [idPago, setIdPago] = useState(item?.idPago?.toString() ?? '');
   const [idDocumento, setIdDocumento] = useState(item?.idDocumento?.toString() ?? '');
   const [fechaAplicacion, setFecha] = useState(item?.fechaAplicacion?.slice(0, 10) ?? todayIso());
   const [montoAplicado, setMonto] = useState(item?.montoAplicado?.toString() ?? '');
-  const [idEmpleado, setEmp] = useState(item?.idEmpleado?.toString() ?? '');
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    Promise.all([
-      apiClient.get<CatalogoOption[]>('/cxc/catalogos/pagos'),
-      apiClient.get<CatalogoOption[]>('/cxc/catalogos/empleados'),
-    ])
-      .then(([pagosData, empleadosData]) => {
-        setPagos(pagosData);
-        setEmpleados(empleadosData);
-      })
-      .catch(() => {
-        setPagos([]);
-        setEmpleados([]);
-      });
+    apiClient.get<CatalogoOption[]>('/cxc/catalogos/pagos')
+      .then(setPagos)
+      .catch(() => setPagos([]));
   }, []);
 
   const pagoSeleccionado = pagos.find((p) => String(p.id) === idPago);
@@ -87,8 +76,6 @@ export function AplicacionPagoForm({
     const documentoErr = validateRequiredSelect(idDocumento, 'un documento pendiente del cliente');
     if (documentoErr) next.idDocumento = documentoErr;
 
-    const empleadoErr = validateRequiredSelect(idEmpleado, 'el empleado que aplica el pago');
-    if (empleadoErr) next.idEmpleado = empleadoErr;
 
     const fechaErr = validateRequiredDate(fechaAplicacion, 'La fecha de aplicación', {
       notFuture: true,
@@ -106,7 +93,7 @@ export function AplicacionPagoForm({
     }
 
     return next;
-  }, [idPago, idDocumento, idEmpleado, fechaAplicacion, montoAplicado, maxAplicable]);
+  }, [idPago, idDocumento, fechaAplicacion, montoAplicado, maxAplicable]);
 
   const isFormValid = !hasErrors(validationErrors);
   const errorFor = (field: string, value = '') =>
@@ -133,7 +120,6 @@ export function AplicacionPagoForm({
       idDocumento: Number(idDocumento),
       fechaAplicacion,
       montoAplicado: Number(montoAplicado),
-      idEmpleado: Number(idEmpleado),
     };
 
     try {
@@ -205,16 +191,6 @@ export function AplicacionPagoForm({
           error={errorFor('montoAplicado', montoAplicado)}
         />
       </div>
-
-      <Select
-        label="Empleado"
-        required
-        value={idEmpleado}
-        onChange={(e: any) => setEmp(e.target.value)}
-        options={empleados.map((x) => ({ value: x.id, label: x.label }))}
-        helperText="Empleado responsable de registrar la aplicación."
-        error={errorFor('idEmpleado')}
-      />
 
       {formError && (
         <p className="text-sm text-red-600 font-medium bg-red-50 border border-red-200 rounded-lg px-3 py-2">

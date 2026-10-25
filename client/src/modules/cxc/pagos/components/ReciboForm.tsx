@@ -12,6 +12,7 @@ import {
   type ValidationErrors,
 } from '../../../../shared/validation';
 import type { Recibo, CatalogoOption } from '@erp/contracts';
+import { SearchableSelect } from '../../../../shared/components/SearchableSelect';
 
 const ESTADOS_RECIBO = ['EMITIDO', 'CANCELADO'] as const;
 
@@ -123,7 +124,7 @@ export function ReciboForm({
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
-      <Select
+      <SearchableSelect
         label="Cliente"
         required
         value={idCliente}

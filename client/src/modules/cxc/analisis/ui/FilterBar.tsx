@@ -22,7 +22,7 @@ interface Props {
 
 const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 const TRAMOS = ['Al corriente', '1 a 30 días', '31 a 60 días', '61 a 90 días', 'Más de 90 días'];
-const dateCls = 'h-8 rounded border border-slate-300 bg-white px-2 text-[13px] text-slate-800 outline-none hover:border-slate-400 focus:border-blue-700 focus:ring-2 focus:ring-blue-100';
+const dateCls = 'h-10 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none hover:border-slate-400 focus:border-blue-700 focus:ring-2 focus:ring-blue-100';
 
 /** Barra de segmentadores (slicers) fija bajo el encabezado, con las selecciones hechas en los gráficos. */
 export function FilterBar({ filtros, onChange, onLimpiar, mostrarLimpiar, cobrador = true, ruta = true, cliente = false, nota }: Props) {

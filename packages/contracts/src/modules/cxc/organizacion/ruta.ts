@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { identifierSchema, optionalIsoDateSchema, optionalTrimmedText } from '../validation';
+import { identifierSchema, soloLetrasSchema, optionalIsoDateSchema, optionalTrimmedText } from '../validation';
 
 export const ESTADOS_RUTA = ['PLANIFICADA', 'EN_PROCESO', 'COMPLETADA', 'CANCELADA'] as const;
 
@@ -16,8 +16,8 @@ export const rutaSchema = z.object({
 export type Ruta = z.infer<typeof rutaSchema>;
 
 export const createRutaSchema = z.object({
-  codigoRuta: identifierSchema('El código de ruta', 30).optional(),
-  nombre: z.string().trim().min(1, 'El nombre es obligatorio').max(120),
+  codigoRuta: identifierSchema('El código de ruta', 20).optional(),
+  nombre: soloLetrasSchema('El nombre', 120),
   idEmpleado: z.number().int().positive('Selecciona un empleado responsable'),
   fecha: optionalIsoDateSchema('La fecha'),
   estado: z.enum(ESTADOS_RUTA).default('PLANIFICADA'),

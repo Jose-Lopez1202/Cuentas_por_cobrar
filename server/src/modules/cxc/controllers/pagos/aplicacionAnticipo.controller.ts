@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as service from '../../services/pagos/aplicacionAnticipo.service';
+import { conEmpleadoActual } from '../../../auth/empleadoActual';
 
 export async function list(req: Request, res: Response, next: NextFunction) {
   try {
@@ -25,7 +26,7 @@ export async function getOne(req: Request, res: Response, next: NextFunction) {
 
 export async function create(req: Request, res: Response, next: NextFunction) {
   try {
-    res.status(201).json(await service.createAplicacionAnticipo(req.body));
+    res.status(201).json(await service.createAplicacionAnticipo(await conEmpleadoActual(req)));
   } catch (e) {
     next(e);
   }
@@ -50,7 +51,7 @@ export async function remove(req: Request, res: Response, next: NextFunction) {
 
 export async function reversar(req: Request, res: Response, next: NextFunction) {
   try {
-    res.json(await service.reversarAplicacionAnticipo(Number(req.params.id), req.body));
+    res.json(await service.reversarAplicacionAnticipo(Number(req.params.id), await conEmpleadoActual(req, 'idEmpleadoReversa')));
   } catch (e) {
     next(e);
   }

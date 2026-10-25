@@ -4,9 +4,11 @@ import { FormActionButtons } from '../../../../shared/components/FormActionButto
 import { apiClient, ApiError } from '../../../../shared/api';
 import {
   hasErrors,
+  sanitizeSoloLetras,
   validateMaxLength,
   validateRequired,
   validateRequiredSelect,
+  validateSoloLetras,
   type ValidationErrors,
 } from '../../../../shared/validation';
 import type { CatalogoOption, Sucursal } from '@erp/contracts';
@@ -45,6 +47,8 @@ export const SucursalForm = ({ sucursal, onSuccess, onCancel }: SucursalFormProp
     if (nombreErr) next.nombre = nombreErr;
     const nombreMax = validateMaxLength(nombre, 'El nombre de la sucursal', 150);
     if (nombreMax) next.nombre = nombreMax;
+    const nombreLetras = validateSoloLetras(nombre, 'El nombre de la sucursal');
+    if (nombreLetras) next.nombre = nombreLetras;
     const dirMax = validateMaxLength(direccion, 'La dirección', 200);
     if (dirMax) next.direccion = dirMax;
     return next;
@@ -105,10 +109,10 @@ export const SucursalForm = ({ sucursal, onSuccess, onCancel }: SucursalFormProp
         required
         maxLength={150}
         value={nombre}
-        onChange={(e: any) => setNombre(e.target.value)}
+        onChange={(e: any) => setNombre(sanitizeSoloLetras(e.target.value))}
         error={errors.nombre ?? (nombre ? validationErrors.nombre : undefined)}
-        helperText="Nombre visible de la sede; máximo 150 caracteres."
-        placeholder="Ej. Sucursal Zona 9"
+        helperText="Solo letras y espacios, sin números ni signos; máximo 150 caracteres."
+        placeholder="Ej. Sucursal Centro"
       />
 
       <TextInput

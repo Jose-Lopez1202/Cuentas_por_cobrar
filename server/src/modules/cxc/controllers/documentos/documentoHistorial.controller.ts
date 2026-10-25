@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as historialService from '../../services/documentos/documentoHistorial.service';
+import { conEmpleadoActual } from '../../../auth/empleadoActual';
 
 export async function listByDocumento(req: Request, res: Response, next: NextFunction) {
   try {
@@ -11,7 +12,7 @@ export async function listByDocumento(req: Request, res: Response, next: NextFun
 
 export async function create(req: Request, res: Response, next: NextFunction) {
   try {
-    res.status(201).json(await historialService.createHistorial(Number(req.params.id), req.body));
+    res.status(201).json(await historialService.createHistorial(Number(req.params.id), await conEmpleadoActual(req)));
   } catch (err) {
     next(err);
   }

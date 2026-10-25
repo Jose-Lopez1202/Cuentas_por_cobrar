@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import * as service from '../../services/credito/aplicacionNotaCredito.service';
+import { conEmpleadoActual } from '../../../auth/empleadoActual';
 
 export async function list(req: Request, res: Response, next: NextFunction) {
   try {
@@ -16,7 +17,7 @@ export async function getOne(req: Request, res: Response, next: NextFunction) {
 }
 
 export async function create(req: Request, res: Response, next: NextFunction) {
-  try { res.status(201).json(await service.create(req.body)); } catch (error) { next(error); }
+  try { res.status(201).json(await service.create(await conEmpleadoActual(req))); } catch (error) { next(error); }
 }
 
 export async function update(req: Request, res: Response, next: NextFunction) {
@@ -28,5 +29,5 @@ export async function remove(req: Request, res: Response, next: NextFunction) {
 }
 
 export async function reversar(req: Request, res: Response, next: NextFunction) {
-  try { res.json(await service.reversar(Number(req.params.id), req.body)); } catch (error) { next(error); }
+  try { res.json(await service.reversar(Number(req.params.id), await conEmpleadoActual(req, 'idEmpleadoReversa'))); } catch (error) { next(error); }
 }

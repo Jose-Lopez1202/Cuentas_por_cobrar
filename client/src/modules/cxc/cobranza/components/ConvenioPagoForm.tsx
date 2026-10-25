@@ -4,6 +4,7 @@ import { FormActionButtons } from '../../../../shared/components/FormActionButto
 import { apiClient, ApiError } from '../../../../shared/api';
 import { todayIso, validateRequiredSelect, validateRequiredDate, validateMoney, validateRequiredNumber, validateMaxLength, hasErrors, type ValidationErrors } from '../../../../shared/validation';
 import type { CatalogoOption, ConvenioPago } from '@erp/contracts';
+import { SearchableSelect } from '../../../../shared/components/SearchableSelect';
 
 interface ConvenioPagoFormProps { convenio?: ConvenioPago | null; onSuccess: () => void; onCancel: () => void; }
 const ESTADOS_CONVENIO_PAGO = ['ACTIVO', 'CUMPLIDO', 'INCUMPLIDO', 'CANCELADO'] as const;
@@ -173,7 +174,7 @@ export const ConvenioPagoForm = ({ convenio, onSuccess, onCancel }: ConvenioPago
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
-      <Select label="Cliente" required value={idCliente} onChange={(e: any) => setIdCliente(e.target.value)} options={clientes.map((c) => ({ value: c.id, label: c.label }))} error={errors.idCliente} isReadOnly={isEditing} helperText={isEditing ? 'El cliente queda fijo porque el convenio ya tiene plan de cuotas.' : 'Cliente con quien se formaliza el convenio.'} />
+      <SearchableSelect label="Cliente" required value={idCliente} onChange={(e: any) => setIdCliente(e.target.value)} options={clientes.map((c) => ({ value: c.id, label: c.label }))} error={errors.idCliente} isReadOnly={isEditing} helperText={isEditing ? 'El cliente queda fijo porque el convenio ya tiene plan de cuotas.' : 'Cliente con quien se formaliza el convenio.'} />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <TextInput label="Fecha del convenio" type="date" required min={todayIso()} value={fechaConvenio} onChange={(e: any) => setFechaConvenio(e.target.value)} error={vivo('fechaConvenio', !!fechaConvenio)} isReadOnly={isEditing} helperText={isEditing ? 'La fecha original no cambia al editar.' : 'Fecha del acuerdo; no puede ser anterior a hoy. Las cuotas vencen mes a mes desde esta fecha.'} />
         <TextInput

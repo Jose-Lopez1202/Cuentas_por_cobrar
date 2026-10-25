@@ -11,6 +11,7 @@ import {
   type ValidationErrors,
 } from '../../../../shared/validation';
 import type { AplicacionAnticipo, CatalogoOption } from '@erp/contracts';
+import { SearchableSelect } from '../../../../shared/components/SearchableSelect';
 
 export function AplicacionAnticipoForm({
   item,
@@ -25,11 +26,9 @@ export function AplicacionAnticipoForm({
   const [clientes, setClientes] = useState<CatalogoOption[]>([]);
   const [anticipos, setAnticipos] = useState<CatalogoOption[]>([]);
   const [documentos, setDocumentos] = useState<CatalogoOption[]>([]);
-  const [empleados, setEmpleados] = useState<CatalogoOption[]>([]);
   const [idCliente, setIdCliente] = useState('');
   const [idAnticipo, setIdAnticipo] = useState(item?.idAnticipo?.toString() ?? '');
   const [idDocumento, setIdDocumento] = useState(item?.idDocumento?.toString() ?? '');
-  const [idEmpleado, setIdEmpleado] = useState(item?.idEmpleado?.toString() ?? '');
   const [fechaAplicacion, setFecha] = useState(item?.fechaAplicacion?.slice(0, 10) ?? todayIso());
   const [montoAplicado, setMonto] = useState(item?.montoAplicado?.toString() ?? '');
   const [errors, setErrors] = useState<ValidationErrors>({});
@@ -38,7 +37,6 @@ export function AplicacionAnticipoForm({
 
   useEffect(() => {
     apiClient.get<CatalogoOption[]>('/cxc/catalogos/clientes').then(setClientes).catch(() => setClientes([]));
-    apiClient.get<CatalogoOption[]>('/cxc/catalogos/empleados').then(setEmpleados).catch(() => setEmpleados([]));
   }, []);
 
   useEffect(() => {
@@ -80,8 +78,6 @@ export function AplicacionAnticipoForm({
     const documentoErr = validateRequiredSelect(idDocumento, 'un documento pendiente del cliente');
     if (documentoErr) next.idDocumento = documentoErr;
 
-    const empleadoErr = validateRequiredSelect(idEmpleado, 'el empleado que aplica el anticipo');
-    if (empleadoErr) next.idEmpleado = empleadoErr;
 
     const fechaErr = validateRequiredDate(fechaAplicacion, 'La fecha de aplicación', {
       notFuture: true,
@@ -96,7 +92,7 @@ export function AplicacionAnticipoForm({
     }
 
     return next;
-  }, [idCliente, idAnticipo, idDocumento, idEmpleado, fechaAplicacion, montoAplicado, maxAplicable]);
+  }, [idCliente, idAnticipo, idDocumento, fechaAplicacion, montoAplicado, maxAplicable]);
 
   const isFormValid = !hasErrors(validationErrors);
   const errorFor = (field: string, value = '') => errors[field] ?? (value ? validationErrors[field] : undefined);
@@ -115,7 +111,6 @@ export function AplicacionAnticipoForm({
     const payload = {
       idAnticipo: Number(idAnticipo),
       idDocumento: Number(idDocumento),
-      idEmpleado: Number(idEmpleado),
       fechaAplicacion,
       montoAplicado: Number(montoAplicado),
     };
@@ -141,7 +136,7 @@ export function AplicacionAnticipoForm({
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
-      <Select
+      <SearchableSelect
         label="Cliente"
         required
         value={idCliente}
@@ -178,16 +173,6 @@ export function AplicacionAnticipoForm({
         placeholder={idCliente ? 'Seleccionar documento pendiente' : 'Selecciona un cliente primero'}
         helperText="Solo se muestran documentos con saldo pendiente del mismo cliente."
         error={errorFor('idDocumento')}
-      />
-
-      <Select
-        label="Empleado"
-        required
-        value={idEmpleado}
-        onChange={(e: any) => setIdEmpleado(e.target.value)}
-        options={empleados.map((x) => ({ value: x.id, label: x.label }))}
-        helperText="Empleado responsable de registrar la aplicación."
-        error={errorFor('idEmpleado')}
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

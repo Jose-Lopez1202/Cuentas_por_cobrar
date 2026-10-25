@@ -103,7 +103,7 @@ function TablaUsuarios() {
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="bg-white p-4 rounded-lg border border-slate-200 flex-1 min-w-[260px]">
-          <TextInput icon={Search} placeholder="Buscar por usuario, nombre o correo..." value={search}
+          <TextInput icon={Search} maxLength={100} placeholder="Buscar por usuario, nombre o correo..." value={search}
             onChange={(e: any) => { setSearch(e.target.value); setPage(1); }} className="max-w-sm" />
         </div>
         <Button icon={Plus} onClick={() => setModal({ mode: 'create' })}>Nuevo usuario</Button>
@@ -197,7 +197,7 @@ function TablaBitacora() {
   return (
     <>
       <div className="bg-white p-4 rounded-lg border border-slate-200">
-        <TextInput icon={Search} placeholder="Buscar por usuario, evento, IP o detalle..." value={search}
+        <TextInput icon={Search} maxLength={100} placeholder="Buscar por usuario, evento, IP o detalle..." value={search}
           onChange={(e: any) => { setSearch(e.target.value); setPage(1); }} className="max-w-sm" />
       </div>
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}

@@ -13,6 +13,7 @@ import {
   type ValidationErrors,
 } from '../../../../shared/validation';
 import type { CatalogoOption, NotaCredito } from '@erp/contracts';
+import { SearchableSelect } from '../../../../shared/components/SearchableSelect';
 
 interface NotaCreditoFormProps {
   nota?: NotaCredito | null;
@@ -153,7 +154,7 @@ export const NotaCreditoForm = ({ nota, onSuccess, onCancel }: NotaCreditoFormPr
         </div>
       )}
 
-      <Select
+      <SearchableSelect
         label="Cliente"
         required
         value={idCliente}

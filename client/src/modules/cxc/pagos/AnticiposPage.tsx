@@ -48,7 +48,7 @@ export const AnticiposPage = () => {
       </div>
 
       <div className="bg-white p-4 rounded-lg border border-slate-200">
-        <TextInput icon={Search} placeholder="Buscar..." value={search} onChange={(e: any) => { setSearch(e.target.value); setPage(1); }} className="max-w-sm" />
+        <TextInput icon={Search} maxLength={100} placeholder="Buscar cliente, referencia, estado o ID..." value={search} onChange={(e: any) => { setSearch(e.target.value); setPage(1); }} className="max-w-md" />
       </div>
 
       {(error || deleteError) && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">{error || deleteError}</p>}
@@ -129,8 +129,6 @@ export const AnticiposPage = () => {
           description="El anticipo quedará marcado como anulado de forma permanente y su disponible pasará a Q 0.00. Solo se puede anular un anticipo sin aplicaciones vigentes."
           endpoint={`/cxc/anticipos/${aAnular.idAnticipo}/anular`}
           actionLabel="Anular"
-          empleadoLabel="Empleado que anula"
-          empleadoFieldName="idEmpleadoAnulacion"
           motivoLabel="Motivo de la anulación"
           motivoFieldName="motivoAnulacion"
           onClose={() => setAAnular(null)}

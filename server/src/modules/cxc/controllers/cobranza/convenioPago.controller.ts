@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as convenioPagoService from '../../services/cobranza/convenioPago.service';
+import { conEmpleadoActual } from '../../../auth/empleadoActual';
 
 export async function list(req: Request, res: Response, next: NextFunction) {
   try {
@@ -61,7 +62,7 @@ export async function listCuotas(req: Request, res: Response, next: NextFunction
 
 export async function pagarCuota(req: Request, res: Response, next: NextFunction) {
   try {
-    const cuota = await convenioPagoService.registrarPagoCuota(Number(req.params.idCuota), req.body);
+    const cuota = await convenioPagoService.registrarPagoCuota(Number(req.params.idCuota), await conEmpleadoActual(req));
     res.json(cuota);
   } catch (err) {
     next(err);

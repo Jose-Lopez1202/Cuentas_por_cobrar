@@ -12,7 +12,7 @@ import { Drawer } from '../analisis/ui/Drawer';
 import { EstadoPill } from '../analisis/ui/Pills';
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-const selectCls = 'h-9 rounded-md border border-slate-300 bg-white px-2.5 text-[13px] text-slate-800 outline-none hover:border-slate-400 focus:border-blue-700 focus:ring-2 focus:ring-blue-100';
+const selectCls = 'h-10 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none hover:border-slate-400 focus:border-blue-700 focus:ring-2 focus:ring-blue-100';
 
 const Campo = ({ etiqueta, valor }: { etiqueta: string; valor: React.ReactNode }) => (
   <div className="flex items-start justify-between gap-6 border-b border-slate-100 py-2.5 text-[13px] last:border-0">
