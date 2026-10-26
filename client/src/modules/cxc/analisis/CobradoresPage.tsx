@@ -14,7 +14,7 @@ import { Medidor } from './ui/Pills';
 import { useDetalle } from './detalle/DetalleHost';
 
 export const CobradoresPage = () => {
-  const { filtros, query, cambiar, limpiar, hayFiltrosExtra } = useFiltros('90d');
+  const { filtros, query, cambiar, alternar, limpiar, hayFiltrosExtra } = useFiltros('90d');
   const { data, loading, error, reload } = useApi<CobradoresReporte>('/cxc/analitica/cobradores', { ...query, idEmpleado: undefined });
   const { abrir, host } = useDetalle(query);
 
@@ -22,6 +22,13 @@ export const CobradoresPage = () => {
   const mejor = conCobro[0];
   const peor = conCobro.length > 1 ? conCobro[conCobro.length - 1] : undefined;
   const promedio = conCobro.length ? conCobro.reduce((s, c) => s + c.cobrado, 0) / conCobro.length : 0;
+
+  // Filtrado cruzado: elegir a una persona (en un gráfico o en el filtro) deja el tablero solo con ella.
+  const selId = filtros.idEmpleado;
+  const todos = data?.cobradores ?? [];
+  const visibles = selId ? todos.filter((c) => c.idEmpleado === selId) : todos;
+  const sel = selId ? todos.find((c) => c.idEmpleado === selId) : undefined;
+  const selecciona = (i: { clave: string | number }) => alternar('idEmpleado', Number(i.clave));
 
   const getSpec = (): ReportSpec | null => !data ? null : {
     filename: `ranking-cobradores-${data.desde}_${data.hasta}`,
@@ -37,7 +44,7 @@ export const CobradoresPage = () => {
 
   return (
     <div>
-      <FilterBar filtros={filtros} onChange={cambiar} onLimpiar={limpiar} mostrarLimpiar={hayFiltrosExtra} cobrador={false}
+      <FilterBar filtros={filtros} onChange={cambiar} onLimpiar={limpiar} mostrarLimpiar={hayFiltrosExtra} cliente
         nota="Cobrado = pagos aplicados confirmados, atribuidos a quien los registró" />
       <Encabezado
         titulo="Ranking de cobradores"
@@ -49,40 +56,49 @@ export const CobradoresPage = () => {
 
       {data && (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <KpiCard etiqueta="Total cobrado" valor={Q(data.totales.cobrado)} color={COLOR.azul} nota={`${entero(data.totales.pagos)} pagos aplicados`} />
-            <KpiCard etiqueta="Cobradores activos" valor={entero(data.totales.cobradoresActivos)} color={COLOR.violeta} nota="Con cobro, gestión o ruta en el período" />
-            <KpiCard etiqueta="Cobra más" valor={mejor ? mejor.nombre : '—'} color={COLOR.aqua}
-              nota={mejor ? `${Q(mejor.cobrado)} · ${pct(mejor.participacion)} del total` : 'Sin cobros en el período'}
-              onClick={mejor ? () => abrir({ tipo: 'cobrador', id: mejor.idEmpleado }) : undefined} />
-            <KpiCard etiqueta="Cobra menos" valor={peor ? peor.nombre : '—'} color={COLOR.naranja}
-              nota={peor ? `${Q(peor.cobrado)} · promedio del equipo ${Qc(promedio)}` : 'Se necesitan al menos 2 cobradores con cobro'}
-              onClick={peor ? () => abrir({ tipo: 'cobrador', id: peor.idEmpleado }) : undefined} />
-          </div>
+          {sel ? (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <KpiCard etiqueta="Cobrado" valor={Q(sel.cobrado)} color={COLOR.azul} nota={`${entero(sel.pagos)} pagos · ${entero(sel.clientesCobrados)} clientes`} />
+              <KpiCard etiqueta="Puesto en el ranking" valor={`${sel.posicion} de ${entero(todos.length)}`} color={COLOR.violeta} nota={`${pct(sel.participacion)} del total cobrado`} />
+              <KpiCard etiqueta="Respuesta en gestiones" valor={pct(sel.efectividadGestion, 0)} color={COLOR.aqua} nota={`${entero(sel.gestionesEfectivas)} de ${entero(sel.gestiones)} gestiones`} />
+              <KpiCard etiqueta="Efectividad en ruta" valor={pct(sel.efectividadRuta, 0)} color={COLOR.naranja} nota={`${entero(sel.paradasVisitadas)} de ${entero(sel.paradas)} paradas`} />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <KpiCard etiqueta="Total cobrado" valor={Q(data.totales.cobrado)} color={COLOR.azul} nota={`${entero(data.totales.pagos)} pagos aplicados`} />
+              <KpiCard etiqueta="Cobradores activos" valor={entero(data.totales.cobradoresActivos)} color={COLOR.violeta} nota="Con cobro, gestión o ruta en el período" />
+              <KpiCard etiqueta="Cobra más" valor={mejor ? mejor.nombre : '—'} color={COLOR.aqua}
+                nota={mejor ? `${Q(mejor.cobrado)} · ${pct(mejor.participacion)} del total` : 'Sin cobros en el período'}
+                onClick={mejor ? () => alternar('idEmpleado', mejor.idEmpleado) : undefined} />
+              <KpiCard etiqueta="Cobra menos" valor={peor ? peor.nombre : '—'} color={COLOR.naranja}
+                nota={peor ? `${Q(peor.cobrado)} · promedio del equipo ${Qc(promedio)}` : 'Se necesitan al menos 2 cobradores con cobro'}
+                onClick={peor ? () => alternar('idEmpleado', peor.idEmpleado) : undefined} />
+            </div>
+          )}
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-            <Panel titulo="Quién cobra más" subtitulo="Dinero cobrado en el período. Clic para ver el detalle" cargando={loading}>
+            <Panel titulo="Quién cobra más" subtitulo="Dinero cobrado en el período. Clic para filtrar el tablero; el ícono abre su ficha" cargando={loading}>
               <RankBars
                 items={conCobro.slice(0, 8).map((c) => ({ clave: c.idEmpleado, etiqueta: c.nombre, valor: c.cobrado, secundario: pct(c.participacion, 0) }))}
-                formato={Qc} onSeleccionar={(i) => abrir({ tipo: 'cobrador', id: Number(i.clave) })} vacio="Nadie registró cobros en este período." />
+                formato={Qc} seleccionada={selId} onSeleccionar={selecciona} onDetalle={(i) => abrir({ tipo: 'cobrador', id: Number(i.clave) })} vacio="Nadie registró cobros en este período." />
             </Panel>
             <Panel titulo="Quién gestiona mejor" subtitulo="% de gestiones de cobro en las que el cliente respondió" cargando={loading}>
               <RankBars
                 items={[...data.cobradores].filter((c) => c.gestiones > 0).sort((x, y) => y.efectividadGestion - x.efectividadGestion).slice(0, 8)
                   .map((c) => ({ clave: c.idEmpleado, etiqueta: c.nombre, valor: c.efectividadGestion, secundario: `${c.gestiones} gest.` }))}
-                formato={(n) => pct(n, 0)} color={COLOR.aqua} onSeleccionar={(i) => abrir({ tipo: 'cobrador', id: Number(i.clave) })} vacio="No hay gestiones en el período." />
+                formato={(n) => pct(n, 0)} color={COLOR.aqua} seleccionada={selId} onSeleccionar={selecciona} onDetalle={(i) => abrir({ tipo: 'cobrador', id: Number(i.clave) })} vacio="No hay gestiones en el período." />
             </Panel>
             <Panel titulo="Quién rinde más en ruta" subtitulo="% de paradas visitadas sobre las planificadas" cargando={loading}>
               <RankBars
                 items={[...data.cobradores].filter((c) => c.paradas > 0).sort((x, y) => y.efectividadRuta - x.efectividadRuta).slice(0, 8)
                   .map((c) => ({ clave: c.idEmpleado, etiqueta: c.nombre, valor: c.efectividadRuta, secundario: `${c.paradasVisitadas}/${c.paradas}` }))}
-                formato={(n) => pct(n, 0)} color={COLOR.violeta} onSeleccionar={(i) => abrir({ tipo: 'cobrador', id: Number(i.clave) })} vacio="No hay rutas con paradas en el período." />
+                formato={(n) => pct(n, 0)} color={COLOR.violeta} seleccionada={selId} onSeleccionar={selecciona} onDetalle={(i) => abrir({ tipo: 'cobrador', id: Number(i.clave) })} vacio="No hay rutas con paradas en el período." />
             </Panel>
           </div>
 
           <Panel titulo="Detalle por cobrador" subtitulo="Cobro, gestión de cobranza y efectividad en ruta. Clic en una fila para ver su ficha" cargando={loading}>
             <DataGrid
-              filas={data.cobradores} clave={(c) => c.idEmpleado} porPagina={10} compacta
+              filas={visibles} clave={(c) => c.idEmpleado} porPagina={10} compacta
               ordenInicial={{ id: 'cobrado', dir: 'desc' }}
               onFila={(c) => abrir({ tipo: 'cobrador', id: c.idEmpleado })} etiquetaFila={(c) => `Ver desempeño de ${c.nombre}`}
               buscar={(c) => c.nombre} placeholderBuscar="Buscar cobrador…" vacio="No hay actividad de cobradores en el período."

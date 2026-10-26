@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { CatalogoOption, EstadoCuenta } from '@erp/contracts';
 import { ExportMenu } from '../../../shared/components/ExportMenu';
 import type { ReportSpec } from '../../../shared/export/reportExport';
-import { apiClient } from '../../../shared/api';
+import { apiClient, buildQueryString } from '../../../shared/api';
 import { formatDateGT } from '../../../shared/date';
 import { useApi } from '../analisis/useApi';
 import { COLOR, Q, entero } from '../analisis/format';
@@ -12,18 +12,23 @@ import { KpiCard } from '../analisis/ui/KpiCard';
 import { DataGrid } from '../analisis/ui/DataGrid';
 import { EstadoPill } from '../analisis/ui/Pills';
 import { useDetalle } from '../analisis/detalle/DetalleHost';
+import { Combobox, type OpcionCombo } from '../analisis/ui/Combobox';
 
-const selectCls = 'h-10 w-full max-w-md rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none hover:border-slate-400 focus:border-blue-700 focus:ring-2 focus:ring-blue-100';
 const hoy = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
 export const EstadoCuentaPage = () => {
   const navigate = useNavigate();
-  const [clientes, setClientes] = useState<CatalogoOption[]>([]);
   const [idCliente, setIdCliente] = useState('');
+  const [nombreElegido, setNombreElegido] = useState<string | undefined>();
   const { data: estado, loading, error, reload } = useApi<EstadoCuenta>(idCliente ? `/cxc/reportes/estado-cuenta/${idCliente}` : null);
   const { abrir, host } = useDetalle({ desde: hoy(), hasta: hoy() });
 
-  useEffect(() => { apiClient.get<CatalogoOption[]>('/cxc/catalogos/clientes').then(setClientes).catch(() => setClientes([])); }, []);
+  // El catálogo de clientes puede ser enorme: se busca en el servidor mientras se escribe.
+  const buscarClientes = useCallback(
+    (texto: string) => apiClient.get<CatalogoOption[]>(`/cxc/catalogos/clientes${buildQueryString({ search: texto })}`, { successMessage: false })
+      .then((r): OpcionCombo[] => r.map((c) => ({ valor: String(c.id), etiqueta: c.label }))),
+    [],
+  );
 
   const getSpec = (): ReportSpec | null => {
     if (!estado) return null;
@@ -50,11 +55,13 @@ export const EstadoCuentaPage = () => {
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3" role="search" aria-label="Cliente del estado de cuenta" data-tour="filters">
-        <label htmlFor="ec-cliente" className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Cliente</label>
-        <select id="ec-cliente" className={selectCls} value={idCliente} onChange={(e) => setIdCliente(e.target.value)}>
-          <option value="">Selecciona un cliente…</option>
-          {clientes.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-        </select>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Cliente</span>
+        <Combobox
+          etiqueta="Cliente" valor={idCliente || undefined} etiquetaValor={nombreElegido} ancho="w-[340px]"
+          textoTodos="Selecciona un cliente…" placeholderBuscar="Escribe el nombre del cliente…"
+          buscarRemoto={buscarClientes}
+          onCambiar={(v, o) => { setIdCliente(v ?? ''); setNombreElegido(o?.etiqueta); }}
+        />
         {estado && <button type="button" onClick={() => abrir({ tipo: 'cliente', id: Number(idCliente) })} className="h-9 rounded-md border border-slate-300 bg-white px-3 text-[13px] font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">Ver ficha de riesgo</button>}
       </div>
 

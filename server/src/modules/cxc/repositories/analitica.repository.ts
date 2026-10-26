@@ -19,6 +19,12 @@ export interface Alcance {
   hastaAnt: string;
   idEmpleado?: number;
   idRuta?: number;
+  idCliente?: number;
+  idFormaPago?: number;
+  diaSemana?: number;
+  diaMes?: number;
+  tramo?: number;
+  baseRuta?: string;
 }
 
 export const num = (v: unknown): number => {
@@ -33,9 +39,44 @@ const NOMBRE_EMP = `TRIM(e.NOMBRE || ' ' || e.APELLIDO)`;
 const dia = (col: string) => `TO_CHAR(${col}, 'YYYY-MM-DD')`;
 const entre = (col: string, a: string, b: string) => `${col} >= TO_DATE(:${a}, 'YYYY-MM-DD') AND ${col} < TO_DATE(:${b}, 'YYYY-MM-DD') + 1`;
 
-/** Restringe documentos a los clientes de una ruta. */
-export const porRutaDoc = (a: Alcance, alias = 'd') =>
-  a.idRuta ? ` AND ${alias}.ID_CLIENTE IN (SELECT rd.ID_CLIENTE FROM CXC_RUTA_DETALLE rd WHERE rd.ID_RUTA = :idRuta)` : '';
+const BASE_RE = `'\\s*#\\s*[0-9]+$'`;
+/** Nombre de la ruta sin su número correlativo ("Ruta Zona 1 #31" -> "Ruta Zona 1"). */
+const baseRutaDe = (alias: string) => `REGEXP_REPLACE(TRIM(${alias}.NOMBRE), ${BASE_RE}, '')`;
+
+/** Restringe por ruta, zona o cliente una columna que contiene ID_CLIENTE. */
+export const porRutaCli = (a: Alcance, col: string) =>
+  (a.idRuta ? ` AND ${col} IN (SELECT rd.ID_CLIENTE FROM CXC_RUTA_DETALLE rd WHERE rd.ID_RUTA = :idRuta)` : '')
+  + (a.baseRuta ? ` AND ${col} IN (SELECT rz.ID_CLIENTE FROM CXC_RUTA_DETALLE rz JOIN CXC_RUTAS rr ON rr.ID_RUTA = rz.ID_RUTA WHERE ${baseRutaDe('rr')} = :baseRuta)` : '')
+  + (a.idCliente ? ` AND ${col} = :idCliente` : '');
+
+/** Restringe documentos a los clientes de una ruta / zona / cliente seleccionados. */
+export const porRutaDoc = (a: Alcance, alias = 'd') => porRutaCli(a, `${alias}.ID_CLIENTE`);
+
+/** Selecciones sobre la aplicación de un pago: forma de pago y día. */
+const apExtra = (a: Alcance) =>
+  (a.idFormaPago ? ` AND ap.ID_PAGO IN (SELECT pf.ID_PAGO FROM CXC_PAGOS pf WHERE pf.ID_FORMA_PAGO = :idFormaPago)` : '')
+  + (a.diaSemana ? ` AND TRUNC(ap.FECHA_APLICACION) - TRUNC(ap.FECHA_APLICACION, 'IW') + 1 = :diaSemana` : '')
+  + (a.diaMes ? ` AND TO_NUMBER(TO_CHAR(ap.FECHA_APLICACION, 'DD')) = :diaMes` : '');
+
+/** Tramo de antigüedad seleccionado (solo para consultas de documentos abiertos). */
+const tramoCond = (a: Alcance, alias = 'd') => {
+  const dias = `TRUNC(SYSDATE) - ${alias}.FECHA_VENCIMIENTO`;
+  switch (a.tramo) {
+    case 1: return ` AND ${dias} <= 0`;
+    case 2: return ` AND ${dias} BETWEEN 1 AND 30`;
+    case 3: return ` AND ${dias} BETWEEN 31 AND 60`;
+    case 4: return ` AND ${dias} BETWEEN 61 AND 90`;
+    case 5: return ` AND ${dias} > 90`;
+    default: return '';
+  }
+};
+
+/** Filtros sobre la tabla de rutas (alias r): ruta, zona y cliente que aparece en sus paradas. */
+const rutasExtra = (a: Alcance) =>
+  (a.idRuta ? ' AND r.ID_RUTA = :idRuta' : '')
+  + (a.baseRuta ? ` AND ${baseRutaDe('r')} = :baseRuta` : '')
+  + (a.idCliente ? ' AND EXISTS (SELECT 1 FROM CXC_RUTA_DETALLE xc WHERE xc.ID_RUTA = r.ID_RUTA AND xc.ID_CLIENTE = :idCliente)' : '');
+
 const porEmpleado = (a: Alcance, col: string) => (a.idEmpleado ? ` AND ${col} = :idEmpleado` : '');
 
 type Binds = Record<string, string | number | undefined>;
@@ -52,6 +93,7 @@ async function ejecutar<T>(conn: Connection, sql: string, binds: Binds = {}): Pr
 
 const bindsDe = (a: Alcance): Binds => ({
   desde: a.desde, hasta: a.hasta, desdeAnt: a.desdeAnt, hastaAnt: a.hastaAnt, idEmpleado: a.idEmpleado, idRuta: a.idRuta,
+  idCliente: a.idCliente, idFormaPago: a.idFormaPago, diaSemana: a.diaSemana, diaMes: a.diaMes, baseRuta: a.baseRuta,
 });
 
 async function conConexion<T>(fn: (conn: Connection) => Promise<T>): Promise<T> {
@@ -65,7 +107,7 @@ async function conConexion<T>(fn: (conn: Connection) => Promise<T>): Promise<T> 
 
 // --- Catálogo de filtros ---------------------------------------------------------------
 
-export function catalogoFiltros(): Promise<{ cobradores: CobradorOpcion[]; rutas: RutaOpcion[] }> {
+export function catalogoFiltros(): Promise<{ cobradores: CobradorOpcion[]; rutas: RutaOpcion[]; formasPago: Array<{ idFormaPago: number; nombre: string }> }> {
   return conConexion(async (conn) => {
     const cob = await ejecutar<{ ID: number; NOMBRE: string; CODIGO: string | null }>(
       conn,
@@ -80,7 +122,9 @@ export function catalogoFiltros(): Promise<{ cobradores: CobradorOpcion[]; rutas
       conn,
       `SELECT ID_RUTA AS ID, CODIGO_RUTA AS CODIGO, NOMBRE FROM CXC_RUTAS ORDER BY FECHA DESC, ID_RUTA DESC FETCH FIRST 300 ROWS ONLY`,
     );
+    const fp = await ejecutar<{ ID: number; NOMBRE: string }>(conn, `SELECT ID_FORMA_PAGO AS ID, NOMBRE FROM CXC_FORMAS_PAGO ORDER BY NOMBRE`);
     return {
+      formasPago: fp.map((r) => ({ idFormaPago: r.ID, nombre: r.NOMBRE })),
       cobradores: cob.map((r) => ({ idEmpleado: r.ID, nombre: r.NOMBRE || `Empleado ${r.ID}`, codigo: r.CODIGO })),
       rutas: rut.map((r) => ({ idRuta: r.ID, codigo: r.CODIGO, nombre: r.NOMBRE })),
     };
@@ -96,7 +140,7 @@ export interface ResumenRaw {
   cartera: { TOTAL: number; VENCIDA: number; DOCS: number; CLIENTES: number; CLIENTES_VENC: number };
   antiguedad: Array<{ TRAMO: string; ORDEN: number; MONTO: number; DOCS: number }>;
   deudores: Array<{ ID_CLIENTE: number; NOMBRE: string; NIT: string | null; SALDO: number; VENCIDO: number; DIAS: number; DOCS_VENC: number }>;
-  formas: Array<{ FORMA: string; PAGOS: number; MONTO: number }>;
+  formas: Array<{ ID: number; FORMA: string; PAGOS: number; MONTO: number }>;
   gestionesResultado: Array<{ RESULTADO: string; N: number }>;
   promesas: Array<{ ESTADO: string; N: number; MONTO: number }>;
   promesasVencidas: number;
@@ -110,7 +154,10 @@ export function resumenRaw(a: Alcance): Promise<ResumenRaw> {
     const b = bindsDe(a);
     const rangoTotal = { ...b, desde: a.desdeAnt };
     const doc = porRutaDoc(a);
-    const apEmp = porEmpleado(a, 'ap.ID_EMPLEADO');
+    const apEmp = porEmpleado(a, 'ap.ID_EMPLEADO') + apExtra(a);
+    // Los gráficos con los que se elige no se filtran a sí mismos: siguen mostrando todas las opciones.
+    const apSinFp = porEmpleado(a, 'ap.ID_EMPLEADO') + apExtra({ ...a, idFormaPago: undefined });
+    const apSinEmp = apExtra(a);
 
     const cobradoDia = await ejecutar<ResumenRaw['cobradoDia'][number]>(conn,
       `SELECT ${dia('ap.FECHA_APLICACION')} AS F, SUM(ap.MONTO_APLICADO) AS M, COUNT(*) AS N
@@ -124,7 +171,7 @@ export function resumenRaw(a: Alcance): Promise<ResumenRaw> {
         WHERE ${NO_ANULADO} AND ${entre('d.FECHA_DOCUMENTO', 'desde', 'hasta')}${doc}
         GROUP BY ${dia('d.FECHA_DOCUMENTO')}`, rangoTotal);
 
-    const gestRuta = a.idRuta ? ` AND g.ID_CLIENTE IN (SELECT rd.ID_CLIENTE FROM CXC_RUTA_DETALLE rd WHERE rd.ID_RUTA = :idRuta)` : '';
+    const gestRuta = porRutaCli(a, 'g.ID_CLIENTE');
     const gestionesDia = await ejecutar<ResumenRaw['gestionesDia'][number]>(conn,
       `SELECT ${dia('g.FECHA_GESTION')} AS F, COUNT(*) AS N
          FROM CXC_GESTIONES_COBRO g
@@ -137,7 +184,7 @@ export function resumenRaw(a: Alcance): Promise<ResumenRaw> {
               COUNT(*) AS DOCS,
               COUNT(DISTINCT d.ID_CLIENTE) AS CLIENTES,
               COUNT(DISTINCT CASE WHEN d.FECHA_VENCIMIENTO < TRUNC(SYSDATE) THEN d.ID_CLIENTE END) AS CLIENTES_VENC
-         FROM CXC_DOCUMENTOS d WHERE ${ABIERTO}${doc}`, b))[0];
+         FROM CXC_DOCUMENTOS d WHERE ${ABIERTO}${doc}${tramoCond(a)}`, b))[0];
 
     const antiguedad = await ejecutar<ResumenRaw['antiguedad'][number]>(conn,
       `SELECT TRAMO, ORDEN, SUM(SALDO) AS MONTO, COUNT(*) AS DOCS FROM (
@@ -160,19 +207,19 @@ export function resumenRaw(a: Alcance): Promise<ResumenRaw> {
               MAX(GREATEST(0, TRUNC(SYSDATE) - d.FECHA_VENCIMIENTO)) AS DIAS,
               COUNT(CASE WHEN d.FECHA_VENCIMIENTO < TRUNC(SYSDATE) THEN 1 END) AS DOCS_VENC
          FROM CXC_DOCUMENTOS d JOIN CLIENTE c ON c.ID_CLIENTE = d.ID_CLIENTE
-        WHERE ${ABIERTO}${doc}
+        WHERE ${ABIERTO}${doc}${tramoCond(a)}
         GROUP BY c.ID_CLIENTE, c.NOMBRE, c.NIT
        HAVING SUM(CASE WHEN d.FECHA_VENCIMIENTO < TRUNC(SYSDATE) THEN d.SALDO ELSE 0 END) > 0
         ORDER BY VENCIDO DESC FETCH FIRST 10 ROWS ONLY`, b);
 
     const formas = await ejecutar<ResumenRaw['formas'][number]>(conn,
-      `SELECT fp.NOMBRE AS FORMA, COUNT(DISTINCT ap.ID_PAGO) AS PAGOS, SUM(ap.MONTO_APLICADO) AS MONTO
+      `SELECT fp.ID_FORMA_PAGO AS ID, fp.NOMBRE AS FORMA, COUNT(DISTINCT ap.ID_PAGO) AS PAGOS, SUM(ap.MONTO_APLICADO) AS MONTO
          FROM CXC_APLICACION_PAGOS ap
          JOIN CXC_PAGOS p ON p.ID_PAGO = ap.ID_PAGO
          JOIN CXC_FORMAS_PAGO fp ON fp.ID_FORMA_PAGO = p.ID_FORMA_PAGO
          JOIN CXC_DOCUMENTOS d ON d.ID_DOCUMENTO = ap.ID_DOCUMENTO
-        WHERE ap.ESTADO = 'CONFIRMADA' AND ${entre('ap.FECHA_APLICACION', 'desde', 'hasta')}${apEmp}${doc}
-        GROUP BY fp.NOMBRE ORDER BY MONTO DESC`, b);
+        WHERE ap.ESTADO = 'CONFIRMADA' AND ${entre('ap.FECHA_APLICACION', 'desde', 'hasta')}${apSinFp}${doc}
+        GROUP BY fp.ID_FORMA_PAGO, fp.NOMBRE ORDER BY MONTO DESC`, b);
 
     const gestionesResultado = await ejecutar<ResumenRaw['gestionesResultado'][number]>(conn,
       `SELECT NVL(g.RESULTADO, 'Sin resultado') AS RESULTADO, COUNT(*) AS N
@@ -181,7 +228,7 @@ export function resumenRaw(a: Alcance): Promise<ResumenRaw> {
         GROUP BY NVL(g.RESULTADO, 'Sin resultado') ORDER BY N DESC FETCH FIRST 8 ROWS ONLY`, b);
 
     const promEmp = a.idEmpleado ? ` AND pp.ID_GESTION IN (SELECT ID_GESTION FROM CXC_GESTIONES_COBRO WHERE ID_EMPLEADO = :idEmpleado)` : '';
-    const promRuta = a.idRuta ? ` AND pp.ID_CLIENTE IN (SELECT rd.ID_CLIENTE FROM CXC_RUTA_DETALLE rd WHERE rd.ID_RUTA = :idRuta)` : '';
+    const promRuta = porRutaCli(a, 'pp.ID_CLIENTE');
     const promesas = await ejecutar<ResumenRaw['promesas'][number]>(conn,
       `SELECT pp.ESTADO, COUNT(*) AS N, SUM(pp.MONTO_COMPROMETIDO) AS MONTO
          FROM CXC_PROMESAS_PAGO pp
@@ -208,7 +255,7 @@ export function resumenRaw(a: Alcance): Promise<ResumenRaw> {
            FROM CXC_APLICACION_PAGOS ap
            JOIN EMPLEADO e ON e.ID_EMPLEADO = ap.ID_EMPLEADO
            JOIN CXC_DOCUMENTOS d ON d.ID_DOCUMENTO = ap.ID_DOCUMENTO
-          WHERE ap.ESTADO = 'CONFIRMADA' AND ${entre('ap.FECHA_APLICACION', 'desde', 'hasta')}${apEmp}${doc}
+          WHERE ap.ESTADO = 'CONFIRMADA' AND ${entre('ap.FECHA_APLICACION', 'desde', 'hasta')}${apSinEmp}${doc}
           GROUP BY e.ID_EMPLEADO, ${NOMBRE_EMP} ORDER BY MONTO DESC) WHERE ROWNUM <= 5`, b);
 
     const docsMasDe90 = (await ejecutar<ResumenRaw['docsMasDe90']>(conn,
@@ -237,7 +284,7 @@ export function cobradoresRaw(a: Alcance, soloEmpleado?: number): Promise<Cobrad
     const b = bindsDe(al);
     const rangoTotal = { ...b, desde: a.desdeAnt };
     const doc = porRutaDoc(al);
-    const apEmp = al.idEmpleado ? ' AND ap.ID_EMPLEADO = :idEmpleado' : '';
+    const apEmp = (al.idEmpleado ? ' AND ap.ID_EMPLEADO = :idEmpleado' : '') + apExtra(al);
     const gEmp = al.idEmpleado ? ' AND g.ID_EMPLEADO = :idEmpleado' : '';
 
     const cobros = await ejecutar<CobradorRaw['cobros'][number]>(conn,
@@ -252,7 +299,7 @@ export function cobradoresRaw(a: Alcance, soloEmpleado?: number): Promise<Cobrad
         WHERE ap.ESTADO = 'CONFIRMADA' AND ${entre('ap.FECHA_APLICACION', 'desdeAnt', 'hasta')}${apEmp}${doc}
         GROUP BY e.ID_EMPLEADO, ${NOMBRE_EMP}, e.CODIGO_EMPLEADO`, { ...rangoTotal, desde2: a.desde, desdeAnt: a.desdeAnt });
 
-    const gestRuta = al.idRuta ? ` AND g.ID_CLIENTE IN (SELECT rd.ID_CLIENTE FROM CXC_RUTA_DETALLE rd WHERE rd.ID_RUTA = :idRuta)` : '';
+    const gestRuta = porRutaCli(al, 'g.ID_CLIENTE');
     const gestiones = await ejecutar<CobradorRaw['gestiones'][number]>(conn,
       `SELECT g.ID_EMPLEADO AS ID, COUNT(*) AS TOTAL, COUNT(CASE WHEN ${EFECTIVA} THEN 1 END) AS EFECTIVAS
          FROM CXC_GESTIONES_COBRO g
@@ -266,7 +313,7 @@ export function cobradoresRaw(a: Alcance, soloEmpleado?: number): Promise<Cobrad
         GROUP BY g.ID_EMPLEADO`, b);
 
     const rEmp = al.idEmpleado ? ' AND r.ID_EMPLEADO = :idEmpleado' : '';
-    const rRuta = al.idRuta ? ' AND r.ID_RUTA = :idRuta' : '';
+    const rRuta = rutasExtra(al);
     const rutas = await ejecutar<CobradorRaw['rutas'][number]>(conn,
       `SELECT r.ID_EMPLEADO AS ID, COUNT(DISTINCT r.ID_RUTA) AS RUTAS, COUNT(rd.ID_RUTA_DETALLE) AS PARADAS,
               COUNT(CASE WHEN rd.ESTADO_VISITA = 'VISITADO' THEN 1 END) AS VISITADAS
@@ -306,9 +353,9 @@ export function pagosAplicados(a: Alcance, extra: { cond?: string; binds?: Binds
         WHERE ap.ESTADO = 'CONFIRMADA' AND ${entre('ap.FECHA_APLICACION', 'desde', 'hasta')}
               ${emp ? 'AND ap.ID_EMPLEADO = :idEmpleado' : ''}
               ${extra.idCliente ? 'AND d.ID_CLIENTE = :idCliente' : ''}
-              ${porRutaDoc(a)} ${extra.cond ?? ''}
+              ${porRutaDoc(a)} ${apExtra(a)} ${extra.cond ?? ''}
         ORDER BY ap.FECHA_APLICACION DESC, ap.ID_APLICACION DESC FETCH FIRST ${limite} ROWS ONLY`,
-      { ...bindsDe(a), idEmpleado: emp, idCliente: extra.idCliente, ...(extra.binds ?? {}) });
+      { ...bindsDe(a), idEmpleado: emp, idCliente: extra.idCliente ?? a.idCliente, ...(extra.binds ?? {}) });
     return rows.map((r) => ({
       idAplicacion: r.ID, fecha: r.F, idCliente: r.ID_CLIENTE, cliente: r.CLIENTE, idDocumento: r.ID_DOCUMENTO,
       documento: [r.SERIE, r.NUMERO].filter(Boolean).join('-') || `#${r.ID_DOCUMENTO}`,
@@ -344,19 +391,19 @@ export function detalleCobrador(a: Alcance, idEmpleado: number) {
     const serie = await ejecutar<{ F: string; M: number }>(conn,
       `SELECT ${dia('ap.FECHA_APLICACION')} AS F, SUM(ap.MONTO_APLICADO) AS M
          FROM CXC_APLICACION_PAGOS ap JOIN CXC_DOCUMENTOS d ON d.ID_DOCUMENTO = ap.ID_DOCUMENTO
-        WHERE ap.ESTADO = 'CONFIRMADA' AND ap.ID_EMPLEADO = :idEmpleado AND ${entre('ap.FECHA_APLICACION', 'desde', 'hasta')}${doc}
+        WHERE ap.ESTADO = 'CONFIRMADA' AND ap.ID_EMPLEADO = :idEmpleado AND ${entre('ap.FECHA_APLICACION', 'desde', 'hasta')}${doc}${apExtra(a)}
         GROUP BY ${dia('ap.FECHA_APLICACION')}`, b);
     const clientes = await ejecutar<{ ID: number; NOMBRE: string; M: number; N: number }>(conn,
       `SELECT * FROM (
          SELECT c.ID_CLIENTE AS ID, c.NOMBRE, SUM(ap.MONTO_APLICADO) AS M, COUNT(*) AS N
            FROM CXC_APLICACION_PAGOS ap JOIN CXC_DOCUMENTOS d ON d.ID_DOCUMENTO = ap.ID_DOCUMENTO JOIN CLIENTE c ON c.ID_CLIENTE = d.ID_CLIENTE
-          WHERE ap.ESTADO = 'CONFIRMADA' AND ap.ID_EMPLEADO = :idEmpleado AND ${entre('ap.FECHA_APLICACION', 'desde', 'hasta')}${doc}
+          WHERE ap.ESTADO = 'CONFIRMADA' AND ap.ID_EMPLEADO = :idEmpleado AND ${entre('ap.FECHA_APLICACION', 'desde', 'hasta')}${doc}${apExtra(a)}
           GROUP BY c.ID_CLIENTE, c.NOMBRE ORDER BY M DESC) WHERE ROWNUM <= 15`, b);
     const rutas = await ejecutar<{ ID: number; CODIGO: string | null; NOMBRE: string; F: string; ESTADO: string; PARADAS: number; VISITADAS: number }>(conn,
       `SELECT r.ID_RUTA AS ID, r.CODIGO_RUTA AS CODIGO, r.NOMBRE, ${dia('r.FECHA')} AS F, r.ESTADO,
               COUNT(rd.ID_RUTA_DETALLE) AS PARADAS, COUNT(CASE WHEN rd.ESTADO_VISITA = 'VISITADO' THEN 1 END) AS VISITADAS
          FROM CXC_RUTAS r LEFT JOIN CXC_RUTA_DETALLE rd ON rd.ID_RUTA = r.ID_RUTA
-        WHERE r.ID_EMPLEADO = :idEmpleado AND ${entre('r.FECHA', 'desde', 'hasta')}
+        WHERE r.ID_EMPLEADO = :idEmpleado AND ${entre('r.FECHA', 'desde', 'hasta')}${rutasExtra(a)}
         GROUP BY r.ID_RUTA, r.CODIGO_RUTA, r.NOMBRE, r.FECHA, r.ESTADO ORDER BY r.FECHA DESC FETCH FIRST 30 ROWS ONLY`, b);
     return {
       serie: serie.map((r) => ({ fecha: r.F, cobrado: num(r.M) })),
@@ -373,7 +420,7 @@ export function cobradoPorFecha(a: Alcance): Promise<Array<{ fecha: string; cobr
     const rows = await ejecutar<{ F: string; M: number; N: number }>(conn,
       `SELECT ${dia('ap.FECHA_APLICACION')} AS F, SUM(ap.MONTO_APLICADO) AS M, COUNT(*) AS N
          FROM CXC_APLICACION_PAGOS ap JOIN CXC_DOCUMENTOS d ON d.ID_DOCUMENTO = ap.ID_DOCUMENTO
-        WHERE ap.ESTADO = 'CONFIRMADA' AND ${entre('ap.FECHA_APLICACION', 'desde', 'hasta')}${porEmpleado(a, 'ap.ID_EMPLEADO')}${porRutaDoc(a)}
+        WHERE ap.ESTADO = 'CONFIRMADA' AND ${entre('ap.FECHA_APLICACION', 'desde', 'hasta')}${porEmpleado(a, 'ap.ID_EMPLEADO')}${apExtra(a)}${porRutaDoc(a)}
         GROUP BY ${dia('ap.FECHA_APLICACION')} ORDER BY 1`, bindsDe(a));
     return rows.map((r) => ({ fecha: r.F, cobrado: num(r.M), pagos: num(r.N) }));
   });
@@ -381,7 +428,7 @@ export function cobradoPorFecha(a: Alcance): Promise<Array<{ fecha: string; cobr
 
 // --- Rutas ---------------------------------------------------------------------------------------------
 
-const BASE_RUTA = `REGEXP_REPLACE(TRIM(r.NOMBRE), '\\s*#\\s*[0-9]+$', '')`;
+const BASE_RUTA = baseRutaDe('r');
 
 export interface RutaFila {
   ID: number; CODIGO: string | null; NOMBRE: string; BASE: string; F: string; ESTADO: string; ID_EMPLEADO: number;
@@ -392,7 +439,7 @@ export function rutasRaw(a: Alcance) {
   return conConexion(async (conn) => {
     const b = bindsDe(a);
     const rEmp = a.idEmpleado ? ' AND r.ID_EMPLEADO = :idEmpleado' : '';
-    const rRuta = a.idRuta ? ' AND r.ID_RUTA = :idRuta' : '';
+    const rRuta = rutasExtra(a);
     const filas = await ejecutar<RutaFila>(conn,
       `SELECT r.ID_RUTA AS ID, r.CODIGO_RUTA AS CODIGO, r.NOMBRE, ${BASE_RUTA} AS BASE, ${dia('r.FECHA')} AS F, r.ESTADO, r.ID_EMPLEADO,
               COUNT(rd.ID_RUTA_DETALLE) AS PARADAS,
@@ -459,7 +506,7 @@ export function riesgoRaw(a: Alcance, idCliente?: number): Promise<RiesgoRaw[]> 
                       SUM(CASE WHEN d.FECHA_VENCIMIENTO < TRUNC(SYSDATE) THEN d.SALDO ELSE 0 END) AS SALDO_VENCIDO,
                       COUNT(CASE WHEN d.FECHA_VENCIMIENTO < TRUNC(SYSDATE) THEN 1 END) AS DOCS_VENC,
                       MAX(GREATEST(0, TRUNC(SYSDATE) - d.FECHA_VENCIMIENTO)) AS DIAS_MAX
-                 FROM CXC_DOCUMENTOS d WHERE ${ABIERTO}${doc} GROUP BY d.ID_CLIENTE) doc ON doc.ID_CLIENTE = c.ID_CLIENTE
+                 FROM CXC_DOCUMENTOS d WHERE ${ABIERTO}${doc}${tramoCond(a)} GROUP BY d.ID_CLIENTE) doc ON doc.ID_CLIENTE = c.ID_CLIENTE
          LEFT JOIN (SELECT d.ID_CLIENTE, ROUND(AVG(ap.FECHA_APLICACION - d.FECHA_VENCIMIENTO), 1) AS DIAS_PROM
                       FROM CXC_APLICACION_PAGOS ap JOIN CXC_DOCUMENTOS d ON d.ID_DOCUMENTO = ap.ID_DOCUMENTO
                      WHERE ap.ESTADO = 'CONFIRMADA' GROUP BY d.ID_CLIENTE) pay ON pay.ID_CLIENTE = c.ID_CLIENTE

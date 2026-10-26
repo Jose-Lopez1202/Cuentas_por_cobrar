@@ -89,11 +89,11 @@ export function datosAnalitica() {
     cartera: { total: 189234.5, vencida: 140909.2, porcentajeVencida: 74.5, diasCartera: 96, documentosAbiertos: 52, clientesConSaldo: 49, clientesVencidos: 43 },
     serie: s,
     antiguedad: [
-      { tramo: 'Al corriente', monto: 48325, documentos: 14 }, { tramo: '1 a 30 días', monto: 61200, documentos: 17 },
-      { tramo: '31 a 60 días', monto: 42800, documentos: 12 }, { tramo: '61 a 90 días', monto: 24100, documentos: 6 }, { tramo: 'Más de 90 días', monto: 12809, documentos: 3 },
+      { orden: 1, tramo: 'Al corriente', monto: 48325, documentos: 14 }, { orden: 2, tramo: '1 a 30 días', monto: 61200, documentos: 17 },
+      { orden: 3, tramo: '31 a 60 días', monto: 42800, documentos: 12 }, { orden: 4, tramo: '61 a 90 días', monto: 24100, documentos: 6 }, { orden: 5, tramo: 'Más de 90 días', monto: 12809, documentos: 3 },
     ],
     topDeudores: cli.slice(0, 8).map((c) => ({ idCliente: c.idCliente, nombre: c.nombre, nit: c.nit, saldoTotal: c.saldoTotal, saldoVencido: c.saldoVencido, diasMaxMora: c.diasMaxMora, documentosVencidos: c.documentosVencidos })),
-    formasPago: [{ formaPago: 'Transferencia', pagos: 96, monto: 61200 }, { formaPago: 'Efectivo', pagos: 78, monto: 38400 }, { formaPago: 'Cheque', pagos: 40, monto: 22950 }],
+    formasPago: [{ idFormaPago: 1, formaPago: 'Transferencia', pagos: 96, monto: 61200 }, { idFormaPago: 2, formaPago: 'Efectivo', pagos: 78, monto: 38400 }, { idFormaPago: 3, formaPago: 'Cheque', pagos: 40, monto: 22950 }],
     gestionesPorResultado: [{ resultado: 'CONTACTADO', cantidad: 120 }, { resultado: 'COMPROMISO_PAGO', cantidad: 98 }, { resultado: 'SIN_RESPUESTA', cantidad: 94 }],
     promesas: [{ estado: 'PENDIENTE', cantidad: 34, monto: 28100 }, { estado: 'CUMPLIDA', cantidad: 21, monto: 17650 }, { estado: 'INCUMPLIDA', cantidad: 9, monto: 7400 }],
     vencimientosProximos: [
@@ -145,6 +145,7 @@ export function datosAnalitica() {
 
   const zonas = ['Ruta Zona 1', 'Ruta Zona 11', 'Ruta Mixco', 'Ruta Villa Nueva', 'Ruta Petapa', 'Ruta Centro Histórico'];
   const rutas: RutasReporte = {
+    zonas: [],
     desde: DESDE, hasta: HASTA,
     totales: { rutas: 35, recurrentes: 5, paradas: 210, visitadas: 138, efectividad: 65.7 },
     rutas: zonas.map((base, i) => ({
@@ -155,6 +156,7 @@ export function datosAnalitica() {
     clientesRecurrentes: CLIENTES.slice(0, 6).map((nombre, i) => ({ idCliente: i + 1, nombre, veces: 5 - Math.floor(i / 2), visitadas: 2, noEncontrado: 3 - Math.floor(i / 2), saldoVencido: 9800 - i * 1050 })),
     porEstado: [{ estado: 'COMPLETADA', cantidad: 18 }, { estado: 'PLANIFICADA', cantidad: 9 }, { estado: 'EN_PROCESO', cantidad: 5 }, { estado: 'CANCELADA', cantidad: 3 }],
   };
+  rutas.zonas = rutas.rutas;
   const rutaDetalle: RutaDetalleGrupo = {
     base: 'Ruta Zona 1',
     salidas: [1, 2, 3].map((n) => ({ idRuta: n, codigo: `R-00${n}1`, nombre: `Ruta Zona 1 #${n}1`, fecha: `2026-10-${String(13 - n * 3).padStart(2, '0')}`, estado: n === 1 ? 'COMPLETADA' : 'PLANIFICADA', idEmpleado: n + 2, cobrador: NOMBRES[n - 1], paradas: 8, visitadas: 8 - n * 2, montoPendiente: 6400 - n * 900 })),
@@ -176,7 +178,7 @@ export function datosAnalitica() {
     visitas: [{ idRuta: 1, codigoRuta: 'R-0001', fecha: '2026-10-13', estado: 'NO_ENCONTRADO', cobrador: NOMBRES[0] }],
   };
 
-  return { filtros: { cobradores: lista.map((c) => ({ idEmpleado: c.idEmpleado, nombre: c.nombre, codigo: c.codigo })), rutas: zonas.map((n, i) => ({ idRuta: i + 1, codigo: `R-000${i + 1}`, nombre: `${n} #${i + 1}` })) }, resumen, cobradores: cobradoresRep, cobradorDetalle, diasCobro, diasDetalle: cobradorDetalle.pagos, rutas, rutaDetalle, riesgo, cliente };
+  return { filtros: { formasPago: [{ idFormaPago: 1, nombre: 'Transferencia' }, { idFormaPago: 2, nombre: 'Efectivo' }, { idFormaPago: 3, nombre: 'Cheque' }], cobradores: lista.map((c) => ({ idEmpleado: c.idEmpleado, nombre: c.nombre, codigo: c.codigo })), rutas: zonas.map((n, i) => ({ idRuta: i + 1, codigo: `R-000${i + 1}`, nombre: `${n} #${i + 1}` })) }, resumen, cobradores: cobradoresRep, cobradorDetalle, diasCobro, diasDetalle: cobradorDetalle.pagos, rutas, rutaDetalle, riesgo, cliente };
 }
 
 /** Registra las rutas de la API de análisis en una página de Playwright. */
@@ -184,6 +186,12 @@ export async function simularAnalitica(page: import('@playwright/test').Page) {
   const d = datosAnalitica();
   const json = (body: unknown) => (route: import('@playwright/test').Route) => route.fulfill({ json: body });
   await page.route('**/localhost:3000/api/cxc/analitica/filtros', json(d.filtros));
+  // Catálogo de clientes con búsqueda en el servidor (parámetro search).
+  await page.route('**/localhost:3000/api/cxc/catalogos/clientes*', (route) => {
+    const texto = (new URL(route.request().url()).searchParams.get('search') ?? '').toLowerCase();
+    const lista = CLIENTES.map((nombre, i) => ({ id: i + 1, label: nombre })).filter((c) => !texto || c.label.toLowerCase().includes(texto));
+    return route.fulfill({ json: lista });
+  });
   await page.route('**/localhost:3000/api/cxc/analitica/resumen*', json(d.resumen));
   await page.route('**/localhost:3000/api/cxc/analitica/cobradores', json(d.cobradores));
   await page.route('**/localhost:3000/api/cxc/analitica/cobradores?*', json(d.cobradores));

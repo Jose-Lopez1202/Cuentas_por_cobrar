@@ -13,7 +13,7 @@ import { EstadoPill, Medidor } from './ui/Pills';
 import { useDetalle } from './detalle/DetalleHost';
 
 export const RutasAnalisisPage = () => {
-  const { filtros, query, cambiar, limpiar, hayFiltrosExtra } = useFiltros('90d');
+  const { filtros, query, cambiar, alternar, limpiar, hayFiltrosExtra } = useFiltros('90d');
   const { data, loading, error, reload } = useApi<RutasReporte>('/cxc/analitica/rutas', query);
   const { abrir, host } = useDetalle(query);
 
@@ -29,7 +29,7 @@ export const RutasAnalisisPage = () => {
 
   return (
     <div>
-      <FilterBar filtros={filtros} onChange={cambiar} onLimpiar={limpiar} mostrarLimpiar={hayFiltrosExtra} ruta
+      <FilterBar filtros={filtros} onChange={cambiar} onLimpiar={limpiar} mostrarLimpiar={hayFiltrosExtra} ruta cliente
         nota="Las rutas con el mismo nombre base (sin el número correlativo) se agrupan como una misma ruta" />
       <Encabezado
         titulo="Rutas recurrentes"
@@ -49,11 +49,12 @@ export const RutasAnalisisPage = () => {
           </div>
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-            <Panel className="xl:col-span-2" titulo="Rutas que más se repiten" subtitulo="Número de salidas por zona. Clic para ver todas las salidas y paradas" cargando={loading}>
+            <Panel className="xl:col-span-2" titulo="Rutas que más se repiten" subtitulo="Número de salidas por zona. Clic para filtrar todo el tablero; el ícono abre sus salidas y paradas" cargando={loading}>
               <RankBars
-                items={data.rutas.slice(0, 10).map((r) => ({ clave: r.base, etiqueta: r.base, valor: r.veces, secundario: r.frecuenciaDias ? `c/${Math.round(r.frecuenciaDias)} d` : undefined }))}
+                items={data.zonas.slice(0, 10).map((r) => ({ clave: r.base, etiqueta: r.base, valor: r.veces, secundario: r.frecuenciaDias ? `c/${Math.round(r.frecuenciaDias)} d` : undefined }))}
                 formato={(n) => `${n} ${n === 1 ? 'salida' : 'salidas'}`} color={COLOR.violeta}
-                onSeleccionar={(i) => abrir({ tipo: 'ruta', base: String(i.clave) })} vacio="No hay rutas en este período." />
+                seleccionada={filtros.baseRuta} onSeleccionar={(i) => alternar('baseRuta', String(i.clave))}
+                onDetalle={(i) => abrir({ tipo: 'ruta', base: String(i.clave) })} vacio="No hay rutas en este período." />
             </Panel>
             <Panel titulo="Estado de las rutas" subtitulo="Cómo terminaron las salidas">
               <ul className="divide-y divide-slate-100">

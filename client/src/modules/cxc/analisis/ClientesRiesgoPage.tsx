@@ -17,13 +17,24 @@ const NIVELES: NivelRiesgo[] = ['CRITICO', 'ALTO', 'MEDIO', 'BAJO'];
 
 export const ClientesRiesgoPage = () => {
   const { filtros, query, cambiar, limpiar, hayFiltrosExtra } = useFiltros('90d');
-  const { data, loading, error, reload } = useApi<ClientesRiesgoReporte>('/cxc/analitica/clientes-riesgo', { ...query, idEmpleado: undefined });
+  const { data, loading, error, reload } = useApi<ClientesRiesgoReporte>('/cxc/analitica/clientes-riesgo', { ...query, idEmpleado: undefined, idCliente: undefined });
   const { abrir, host } = useDetalle(query);
   const [nivel, setNivel] = useState<NivelRiesgo | 'TODOS'>('TODOS');
 
-  const filas = useMemo(() => (data ? data.clientes.filter((c) => nivel === 'TODOS' || c.nivel === nivel) : []), [data, nivel]);
-  const t = data?.totales;
-  const conteo = (n: NivelRiesgo) => (t ? { CRITICO: t.criticos, ALTO: t.altos, MEDIO: t.medios, BAJO: t.bajos }[n] : 0);
+  // Filtrado cruzado en el cliente: elegir un punto, un nivel o un cliente recalcula todo el tablero.
+  const selCliente = filtros.idCliente;
+  const base = data?.clientes ?? [];
+  const porCliente = useMemo(() => base.filter((c) => !selCliente || c.idCliente === selCliente), [base, selCliente]);
+  const filas = useMemo(() => porCliente.filter((c) => nivel === 'TODOS' || c.nivel === nivel), [porCliente, nivel]);
+  const conteo = (n: NivelRiesgo) => porCliente.filter((c) => c.nivel === n).length;
+  const t = data ? {
+    clientes: porCliente.length,
+    criticos: conteo('CRITICO'), altos: conteo('ALTO'), medios: conteo('MEDIO'), bajos: conteo('BAJO'),
+    saldoVencido: porCliente.reduce((s, c) => s + c.saldoVencido, 0),
+    saldoEnRiesgo: porCliente.filter((c) => c.nivel === 'CRITICO' || c.nivel === 'ALTO').reduce((s, c) => s + c.saldoVencido, 0),
+  } : undefined;
+  const elegirPunto = (c: { idCliente: number; nombre: string }) =>
+    cambiar(selCliente === c.idCliente ? { idCliente: undefined } : { idCliente: c.idCliente, nombreCliente: c.nombre });
 
   const getSpec = (): ReportSpec | null => !data ? null : {
     filename: `clientes-en-riesgo-${new Date().toISOString().slice(0, 10)}`,
@@ -38,7 +49,7 @@ export const ClientesRiesgoPage = () => {
 
   return (
     <div>
-      <FilterBar filtros={filtros} onChange={cambiar} onLimpiar={limpiar} mostrarLimpiar={hayFiltrosExtra} cobrador={false}
+      <FilterBar filtros={filtros} onChange={cambiar} onLimpiar={limpiar} mostrarLimpiar={hayFiltrosExtra} cobrador={false} cliente
         nota="El riesgo se calcula con el saldo y el historial de hoy; el período no lo cambia" />
       <Encabezado
         titulo="Clientes problemáticos"
@@ -58,10 +69,10 @@ export const ClientesRiesgoPage = () => {
           </div>
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-            <Panel className="xl:col-span-2" titulo="Matriz de riesgo" subtitulo="Arriba a la derecha están los clientes más atrasados y con más dinero vencido. Clic en un punto para abrir su ficha" cargando={loading}>
-              <MatrizRiesgo clientes={data.clientes} onSeleccionar={(c) => abrir({ tipo: 'cliente', id: c.idCliente })} />
+            <Panel className="xl:col-span-2" titulo="Matriz de riesgo" subtitulo="Arriba a la derecha están los clientes más atrasados y con más dinero vencido. Clic en un punto para filtrar todo el tablero por ese cliente" cargando={loading}>
+              <MatrizRiesgo clientes={data.clientes} idSeleccionado={selCliente} nivelSeleccionado={nivel === 'TODOS' ? undefined : nivel} onSeleccionar={elegirPunto} />
             </Panel>
-            <Panel titulo="Distribución por nivel" subtitulo="Filtra la tabla con un clic">
+            <Panel titulo="Distribución por nivel" subtitulo="Clic en un nivel para filtrar el tablero">
               <ul className="space-y-1.5">
                 {NIVELES.map((n) => {
                   const cant = conteo(n);

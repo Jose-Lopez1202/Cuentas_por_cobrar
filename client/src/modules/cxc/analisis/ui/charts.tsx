@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { ExternalLink } from 'lucide-react';
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Legend, Line, ResponsiveContainer, Scatter, ScatterChart,
   Tooltip, XAxis, YAxis, ZAxis,
@@ -114,15 +115,24 @@ export function ColumnasChart({ datos, color = COLOR.azul, destacada, alto = 220
 
 export interface RankItem { clave: string | number; etiqueta: string; valor: number; secundario?: string; color?: string; marca?: ReactNode }
 
-/** Ranking en barras horizontales con el valor en la punta; cada fila puede abrir su detalle. */
-export function RankBars({ items, color = COLOR.azul, formato = Q, onSeleccionar, vacio = 'Sin datos en el período.' }: {
-  items: RankItem[]; color?: string; formato?: (n: number) => string; onSeleccionar?: (i: RankItem) => void; vacio?: string;
+/**
+ * Ranking en barras horizontales con el valor en la punta.
+ * - `onSeleccionar`: un clic filtra todo el tablero por esa fila (otro clic lo quita); `seleccionada` resalta la elegida.
+ * - `onDetalle`: abre el detalle completo. Si no hay `onSeleccionar`, toda la fila abre el detalle.
+ */
+export function RankBars({ items, color = COLOR.azul, formato = Q, onSeleccionar, onDetalle, seleccionada, vacio = 'Sin datos en el período.' }: {
+  items: RankItem[]; color?: string; formato?: (n: number) => string;
+  onSeleccionar?: (i: RankItem) => void; onDetalle?: (i: RankItem) => void;
+  seleccionada?: string | number; vacio?: string;
 }) {
   const max = Math.max(...items.map((i) => i.valor), 0);
   if (!items.length || max <= 0) return <p className="py-8 text-center text-sm text-slate-500">{vacio}</p>;
+  const hayEleccion = seleccionada !== undefined;
   return (
     <ul className="space-y-1">
       {items.map((i, idx) => {
+        const elegida = hayEleccion && String(i.clave) === String(seleccionada);
+        const atenuada = hayEleccion && !elegida;
         const fila = (
           <>
             <span className="w-5 shrink-0 text-right text-[11px] font-semibold tabular-nums text-slate-400">{idx + 1}</span>
@@ -137,12 +147,26 @@ export function RankBars({ items, color = COLOR.azul, formato = Q, onSeleccionar
             {i.marca}
           </>
         );
+        const base = `flex w-full items-center gap-2.5 rounded px-1.5 py-1.5 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${atenuada ? 'opacity-45' : ''}`;
+        if (onSeleccionar) {
+          return (
+            <li key={i.clave} className={`flex items-center rounded ${elegida ? 'bg-blue-50 ring-1 ring-inset ring-blue-300' : ''}`}>
+              <button type="button" onClick={() => onSeleccionar(i)} aria-pressed={elegida} aria-label={`Filtrar el tablero por ${i.etiqueta}`}
+                className={`${base} ${elegida ? '' : 'hover:bg-slate-50'}`}>{fila}</button>
+              {onDetalle && (
+                <button type="button" onClick={() => onDetalle(i)} aria-label={`Ver detalle de ${i.etiqueta}`} title="Ver detalle"
+                  className="mr-1 shrink-0 rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">
+                  <ExternalLink size={14} aria-hidden="true" />
+                </button>
+              )}
+            </li>
+          );
+        }
         return (
           <li key={i.clave}>
-            {onSeleccionar ? (
-              <button type="button" onClick={() => onSeleccionar(i)} aria-label={`Ver detalle de ${i.etiqueta}`}
-                className="flex w-full items-center gap-2.5 rounded px-1.5 py-1.5 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">{fila}</button>
-            ) : <div className="flex items-center gap-2.5 px-1.5 py-1.5">{fila}</div>}
+            {onDetalle ? (
+              <button type="button" onClick={() => onDetalle(i)} aria-label={`Ver detalle de ${i.etiqueta}`} className={`${base} hover:bg-slate-50`}>{fila}</button>
+            ) : <div className={`${base}`}>{fila}</div>}
           </li>
         );
       })}
@@ -153,7 +177,7 @@ export function RankBars({ items, color = COLOR.azul, formato = Q, onSeleccionar
 const DIAS_CORTOS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
 /** Mapa de calor: día de la semana (columnas) por semana del mes (filas). Escala de un solo tono. */
-export function MapaCalor({ celdas, onSeleccionar }: { celdas: CeldaCalor[]; onSeleccionar?: (diaSemana: number) => void }) {
+export function MapaCalor({ celdas, onSeleccionar, diaSeleccionado }: { celdas: CeldaCalor[]; onSeleccionar?: (diaSemana: number) => void; diaSeleccionado?: number }) {
   const [activa, setActiva] = useState<CeldaCalor | null>(null);
   const max = Math.max(...celdas.map((c) => c.cobrado), 0);
   const tono = (v: number) => (v <= 0 || max <= 0 ? '#f1f5f9' : `rgba(42,120,214,${0.14 + (v / max) * 0.86})`);
@@ -176,8 +200,9 @@ export function MapaCalor({ celdas, onSeleccionar }: { celdas: CeldaCalor[]; onS
                   key={i} type="button" onClick={() => onSeleccionar?.(i + 1)}
                   onMouseEnter={() => setActiva(c)} onMouseLeave={() => setActiva(null)} onFocus={() => setActiva(c)} onBlur={() => setActiva(null)}
                   aria-label={`${DIAS_CORTOS[i]} de la semana ${s}: ${Q(c.cobrado)} en ${c.pagos} pagos`}
-                  className={`flex h-9 items-center justify-center rounded-[3px] font-medium tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-700 ${oscuro ? 'text-white' : 'text-slate-700'}`}
-                  style={{ backgroundColor: tono(c.cobrado) }}
+                  aria-pressed={diaSeleccionado === i + 1}
+                  className={`flex h-9 items-center justify-center rounded-[3px] font-medium tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-700 ${oscuro ? 'text-white' : 'text-slate-700'} ${diaSeleccionado === i + 1 ? 'ring-2 ring-slate-900' : ''}`}
+                  style={{ backgroundColor: tono(c.cobrado), opacity: diaSeleccionado && diaSeleccionado !== i + 1 ? 0.4 : 1 }}
                 >
                   {c.cobrado > 0 ? Qc(c.cobrado).replace('Q ', '') : ''}
                 </button>
@@ -198,7 +223,11 @@ export function MapaCalor({ celdas, onSeleccionar }: { celdas: CeldaCalor[]; onS
 }
 
 /** Matriz de riesgo: antigüedad (x) contra monto vencido (y); el color es el nivel de riesgo. */
-export function MatrizRiesgo({ clientes, onSeleccionar, alto = 300 }: { clientes: ClienteRiesgo[]; onSeleccionar: (c: ClienteRiesgo) => void; alto?: number }) {
+export function MatrizRiesgo({ clientes, onSeleccionar, alto = 300, idSeleccionado, nivelSeleccionado }: {
+  clientes: ClienteRiesgo[]; onSeleccionar: (c: ClienteRiesgo) => void; alto?: number; idSeleccionado?: number; nivelSeleccionado?: string;
+}) {
+  const hayEleccion = idSeleccionado !== undefined || nivelSeleccionado !== undefined;
+  const activo = (c: ClienteRiesgo) => (idSeleccionado !== undefined ? c.idCliente === idSeleccionado : nivelSeleccionado ? c.nivel === nivelSeleccionado : true);
   const niveles = ['CRITICO', 'ALTO', 'MEDIO', 'BAJO'] as const;
   return (
     <div style={{ height: alto }} role="img" aria-label="Matriz de riesgo: días de atraso contra saldo vencido por cliente">
@@ -223,6 +252,11 @@ export function MatrizRiesgo({ clientes, onSeleccionar, alto = 300 }: { clientes
             <Scatter isAnimationActive={false}
               key={n} name={RIESGO[n].etiqueta} data={clientes.filter((c) => c.nivel === n)} fill={RIESGO[n].color}
               stroke="#fff" strokeWidth={2} cursor="pointer" onClick={(d) => onSeleccionar(d as unknown as ClienteRiesgo)}
+              shape={(p: { cx?: number; cy?: number; payload?: ClienteRiesgo }) => {
+                const c = p.payload as ClienteRiesgo;
+                const on = !hayEleccion || activo(c);
+                return <circle cx={p.cx} cy={p.cy} r={on && hayEleccion ? 8 : 6} fill={RIESGO[c.nivel].color} fillOpacity={on ? 1 : 0.18} stroke="#fff" strokeWidth={2} />;
+              }}
             />
           ))}
         </ScatterChart>
