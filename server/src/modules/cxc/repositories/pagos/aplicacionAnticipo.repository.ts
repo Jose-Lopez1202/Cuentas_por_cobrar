@@ -1,5 +1,6 @@
 import oracledb from 'oracledb';
 import { getConnection } from '../../../../config/database';
+import { businessTodayIso } from '../../../../shared/date';
 import type {
   AplicacionAnticipo,
   CreateAplicacionAnticipoInput,
@@ -31,6 +32,7 @@ interface AnticipoLockRow {
   MONTO_ORIGINAL: number;
   MONTO_DISPONIBLE: number;
   ESTADO: string;
+  FECHA_ISO: string;
 }
 
 interface DocumentoLockRow {
@@ -47,6 +49,7 @@ interface AplicacionLockRow {
   ID_DOCUMENTO: number;
   MONTO_APLICADO: number;
   ESTADO: string;
+  FECHA_APLICACION_ISO: string;
 }
 
 const mapRow = (r: Row): AplicacionAnticipo => ({
@@ -134,7 +137,8 @@ export async function create(input: CreateAplicacionAnticipoInput): Promise<numb
   const conn = await getConnection();
   try {
     const anticipoResult = await conn.execute<AnticipoLockRow>(
-      `SELECT ID_ANTICIPO, ID_CLIENTE, MONTO_ORIGINAL, MONTO_DISPONIBLE, ESTADO
+      `SELECT ID_ANTICIPO, ID_CLIENTE, MONTO_ORIGINAL, MONTO_DISPONIBLE, ESTADO,
+              TO_CHAR(FECHA, 'YYYY-MM-DD') AS FECHA_ISO
          FROM CXC_ANTICIPOS
         WHERE ID_ANTICIPO = :idAnticipo
         FOR UPDATE`,
@@ -142,6 +146,13 @@ export async function create(input: CreateAplicacionAnticipoInput): Promise<numb
     );
     const anticipo = anticipoResult.rows?.[0];
     if (!anticipo) throw new BadRequestError('El anticipo seleccionado no existe');
+
+    if (input.fechaAplicacion > businessTodayIso()) {
+      throw new BadRequestError('La fecha de aplicación no puede ser futura.');
+    }
+    if (input.fechaAplicacion < anticipo.FECHA_ISO) {
+      throw new BadRequestError('La fecha de aplicación no puede ser anterior a la fecha del anticipo.');
+    }
 
     const documentoResult = await conn.execute<DocumentoLockRow>(
       `SELECT ID_DOCUMENTO, ID_CLIENTE, TOTAL, SALDO, ESTADO
@@ -285,8 +296,8 @@ export async function sumAplicadoPorAnticipo(idAnticipo: number, excludeId?: num
 }
 
 /**
- * Reversa una aplicación CONFIRMADA: bloquea aplicación + documento +
- * anticipo, le devuelve el saldo al documento e incrementa de vuelta
+ * Reversa una aplicación CONFIRMADA: bloquea aplicación + anticipo +
+ * documento, le devuelve el saldo al documento e incrementa de vuelta
  * CXC_ANTICIPOS.MONTO_DISPONIBLE (columna física, no una suma como en
  * pagos/NC). Una transacción, con trazabilidad (quién, cuándo, por qué).
  */
@@ -294,7 +305,8 @@ export async function reversar(id: number, input: ReversarAplicacionAnticipoInpu
   const conn = await getConnection();
   try {
     const aplicacionResult = await conn.execute<AplicacionLockRow>(
-      `SELECT ID_APLICACION_ANTICIPO, ID_ANTICIPO, ID_DOCUMENTO, MONTO_APLICADO, ESTADO
+      `SELECT ID_APLICACION_ANTICIPO, ID_ANTICIPO, ID_DOCUMENTO, MONTO_APLICADO, ESTADO,
+              TO_CHAR(FECHA_APLICACION, 'YYYY-MM-DD') AS FECHA_APLICACION_ISO
          FROM CXC_APLICACION_ANTICIPO
         WHERE ID_APLICACION_ANTICIPO = :id
         FOR UPDATE`,
@@ -305,6 +317,25 @@ export async function reversar(id: number, input: ReversarAplicacionAnticipoInpu
     if (String(aplicacion.ESTADO).trim().toUpperCase() !== 'CONFIRMADA') {
       throw new ConflictError('Esta aplicación ya fue reversada.');
     }
+
+    const fechaReversa = input.fechaReversa ?? businessTodayIso();
+    if (fechaReversa > businessTodayIso()) {
+      throw new BadRequestError('La fecha de reversa no puede ser futura.');
+    }
+    if (fechaReversa < aplicacion.FECHA_APLICACION_ISO) {
+      throw new BadRequestError('La fecha de reversa no puede ser anterior a la aplicación.');
+    }
+
+    const anticipoResult = await conn.execute<AnticipoLockRow>(
+      `SELECT ID_ANTICIPO, ID_CLIENTE, MONTO_ORIGINAL, MONTO_DISPONIBLE, ESTADO,
+              TO_CHAR(FECHA, 'YYYY-MM-DD') AS FECHA_ISO
+         FROM CXC_ANTICIPOS
+        WHERE ID_ANTICIPO = :idAnticipo
+        FOR UPDATE`,
+      { idAnticipo: aplicacion.ID_ANTICIPO },
+    );
+    const anticipo = anticipoResult.rows?.[0];
+    if (!anticipo) throw new BadRequestError('El anticipo de la aplicación ya no existe');
 
     const documentoResult = await conn.execute<DocumentoLockRow>(
       `SELECT ID_DOCUMENTO, ID_CLIENTE, TOTAL, SALDO, ESTADO
@@ -320,16 +351,6 @@ export async function reversar(id: number, input: ReversarAplicacionAnticipoInpu
     if (docEstado === 'ANULADO' || docEstado === 'ANULADA') {
       throw new ConflictError('No se puede reversar una aplicación sobre un documento anulado.');
     }
-
-    const anticipoResult = await conn.execute<AnticipoLockRow>(
-      `SELECT ID_ANTICIPO, ID_CLIENTE, MONTO_ORIGINAL, MONTO_DISPONIBLE, ESTADO
-         FROM CXC_ANTICIPOS
-        WHERE ID_ANTICIPO = :idAnticipo
-        FOR UPDATE`,
-      { idAnticipo: aplicacion.ID_ANTICIPO },
-    );
-    const anticipo = anticipoResult.rows?.[0];
-    if (!anticipo) throw new BadRequestError('El anticipo de la aplicación ya no existe');
 
     const montoAplicado = roundMoney(Number(aplicacion.MONTO_APLICADO));
     const nuevoSaldoDocumento = roundMoney(Number(documento.SALDO) + montoAplicado);
@@ -358,12 +379,12 @@ export async function reversar(id: number, input: ReversarAplicacionAnticipoInpu
       `UPDATE CXC_APLICACION_ANTICIPO
           SET ESTADO = 'REVERSADA',
               ID_EMPLEADO_REVERSA = :idEmpleadoReversa,
-              FECHA_REVERSA = NVL(TO_DATE(:fechaReversa, 'YYYY-MM-DD'), SYSDATE),
+              FECHA_REVERSA = TO_DATE(:fechaReversa, 'YYYY-MM-DD'),
               MOTIVO_REVERSA = :motivoReversa
         WHERE ID_APLICACION_ANTICIPO = :id`,
       {
         idEmpleadoReversa: input.idEmpleadoReversa,
-        fechaReversa: input.fechaReversa ?? null,
+        fechaReversa,
         motivoReversa: input.motivoReversa,
         id,
       },
@@ -378,7 +399,7 @@ export async function reversar(id: number, input: ReversarAplicacionAnticipoInpu
       monto: montoAplicado,
       naturaleza: 'CARGO',
       descripcion: input.motivoReversa,
-      fecha: input.fechaReversa,
+      fecha: fechaReversa,
     });
 
     await conn.commit();

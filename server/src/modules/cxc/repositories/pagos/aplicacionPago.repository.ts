@@ -1,5 +1,6 @@
 import oracledb from 'oracledb';
 import { getConnection } from '../../../../config/database';
+import { businessTodayIso } from '../../../../shared/date';
 import type {
   AplicacionPago,
   CreateAplicacionPagoInput,
@@ -36,6 +37,7 @@ interface PagoLockRow {
   ID_CLIENTE: number;
   MONTO: number;
   ESTADO: string;
+  FECHA_PAGO_ISO: string;
 }
 
 interface DocumentoLockRow {
@@ -53,6 +55,7 @@ interface AplicacionLockRow {
   ID_DOCUMENTO: number;
   MONTO_APLICADO: number;
   ESTADO: string;
+  FECHA_APLICACION_ISO: string;
 }
 
 const mapRow = (r: Row): AplicacionPago => ({
@@ -172,6 +175,10 @@ export async function findById(id: number) {
  * registra la aplicación, actualiza saldo/estado del documento y estado del pago.
  */
 export async function create(i: CreateAplicacionPagoInput): Promise<number> {
+  if (i.fechaAplicacion > businessTodayIso()) {
+    throw new BadRequestError('La fecha de aplicación no puede ser futura');
+  }
+
   const c = await getConnection();
   try {
     if (i.idRutaDetalle) {
@@ -207,7 +214,8 @@ export async function create(i: CreateAplicacionPagoInput): Promise<number> {
       }
     }
     const pagoResult = await c.execute<PagoLockRow>(
-      `SELECT ID_PAGO, ID_CLIENTE, ID_MONEDA, MONTO, ESTADO
+      `SELECT ID_PAGO, ID_CLIENTE, ID_MONEDA, MONTO, ESTADO,
+              TO_CHAR(FECHA_PAGO, 'YYYY-MM-DD') AS FECHA_PAGO_ISO
          FROM CXC_PAGOS
         WHERE ID_PAGO = :idPago
         FOR UPDATE`,
@@ -215,6 +223,9 @@ export async function create(i: CreateAplicacionPagoInput): Promise<number> {
     );
     const pago = pagoResult.rows?.[0];
     if (!pago) throw new BadRequestError('El pago seleccionado no existe');
+    if (i.fechaAplicacion < pago.FECHA_PAGO_ISO) {
+      throw new BadRequestError('La fecha de aplicación no puede ser anterior a la fecha del pago.');
+    }
 
     const documentoResult = await c.execute<DocumentoLockRow>(
       `SELECT ID_DOCUMENTO, ID_CLIENTE, ID_MONEDA, TOTAL, SALDO, ESTADO
@@ -420,10 +431,16 @@ export async function sumAplicadoPorPago(idPago: number, excludeId?: number): Pr
  * (quién, cuándo, por qué).
  */
 export async function reversar(id: number, input: ReversarAplicacionPagoInput): Promise<void> {
+  const fechaReversa = input.fechaReversa ?? businessTodayIso();
+  if (fechaReversa > businessTodayIso()) {
+    throw new BadRequestError('La fecha de reversa no puede ser futura.');
+  }
+
   const c = await getConnection();
   try {
     const aplicacionResult = await c.execute<AplicacionLockRow>(
-      `SELECT ID_APLICACION, ID_PAGO, ID_DOCUMENTO, MONTO_APLICADO, ESTADO
+      `SELECT ID_APLICACION, ID_PAGO, ID_DOCUMENTO, MONTO_APLICADO, ESTADO,
+              TO_CHAR(FECHA_APLICACION, 'YYYY-MM-DD') AS FECHA_APLICACION_ISO
          FROM CXC_APLICACION_PAGOS
         WHERE ID_APLICACION = :id
         FOR UPDATE`,
@@ -434,14 +451,22 @@ export async function reversar(id: number, input: ReversarAplicacionPagoInput): 
     if (String(aplicacion.ESTADO).trim().toUpperCase() !== 'CONFIRMADA') {
       throw new ConflictError('Esta aplicación ya fue reversada.');
     }
+    if (fechaReversa < aplicacion.FECHA_APLICACION_ISO) {
+      throw new BadRequestError('La fecha de reversa no puede ser anterior a la fecha de aplicación.');
+    }
 
     const pagoResult = await c.execute<PagoLockRow>(
-      `SELECT ID_PAGO, ID_CLIENTE, ID_MONEDA, MONTO, ESTADO
-         FROM CXC_PAGOS
-        WHERE ID_PAGO = :idPago
-        FOR UPDATE`,
-      { idPago: aplicacion.ID_PAGO },
-    );
+  `SELECT ID_PAGO,
+          ID_CLIENTE,
+          ID_MONEDA,
+          MONTO,
+          ESTADO,
+          TO_CHAR(FECHA_PAGO, 'YYYY-MM-DD') AS FECHA_PAGO_ISO
+     FROM CXC_PAGOS
+    WHERE ID_PAGO = :idPago
+    FOR UPDATE`,
+  { idPago: aplicacion.ID_PAGO },
+);
     const pago = pagoResult.rows?.[0];
     if (!pago) throw new BadRequestError('El pago de la aplicación ya no existe');
 
@@ -499,7 +524,7 @@ export async function reversar(id: number, input: ReversarAplicacionPagoInput): 
         WHERE ID_APLICACION = :id`,
       {
         idEmpleadoReversa: input.idEmpleadoReversa,
-        fechaReversa: input.fechaReversa ?? null,
+        fechaReversa,
         motivoReversa: input.motivoReversa,
         id,
       },
@@ -514,7 +539,7 @@ export async function reversar(id: number, input: ReversarAplicacionPagoInput): 
       monto: montoAplicado,
       naturaleza: 'CARGO',
       descripcion: input.motivoReversa,
-      fecha: input.fechaReversa,
+      fecha: fechaReversa,
     });
 
     await c.commit();

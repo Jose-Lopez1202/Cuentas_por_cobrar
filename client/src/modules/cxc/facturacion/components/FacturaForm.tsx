@@ -6,11 +6,9 @@ import { apiClient, ApiError } from '../../../../shared/api';
 import { moneyGT } from '../../../../shared/csv';
 import {
   hasErrors,
-  todayIso,
   validateMaxLength,
   validateMoney,
   validateRequired,
-  validateRequiredDate,
   validateRequiredNumber,
   validateRequiredSelect,
   type ValidationErrors,
@@ -29,6 +27,21 @@ const nuevaLinea = (): LineaState => ({ descripcion: '', cantidad: '1', precioUn
 const IVA_GT = 0.12;
 const round2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
 
+
+const hoyGuatemalaIso = (): string => {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Guatemala',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? '';
+
+  return `${get('year')}-${get('month')}-${get('day')}`;
+};
+
 export const FacturaForm = ({ onSuccess, onCancel }: FacturaFormProps) => {
   const [clientes, setClientes] = useState<DocumentoCatalogoOption[]>([]);
   const [monedas, setMonedas] = useState<DocumentoCatalogoOption[]>([]);
@@ -39,7 +52,7 @@ export const FacturaForm = ({ onSuccess, onCancel }: FacturaFormProps) => {
   const [nombreReceptor, setNombreReceptor] = useState('');
   const [idMoneda, setIdMoneda] = useState('');
   const [idCondicion, setIdCondicion] = useState('');
-  const [fechaEmision, setFechaEmision] = useState(todayIso());
+  const [fechaEmision] = useState(hoyGuatemalaIso());
   const [lineas, setLineas] = useState<LineaState[]>([nuevaLinea()]);
 
   const [errors, setErrors] = useState<ValidationErrors>({});
@@ -83,7 +96,12 @@ export const FacturaForm = ({ onSuccess, onCancel }: FacturaFormProps) => {
     set('nitReceptor', validateRequired(nitReceptor, 'El NIT del receptor') ?? validateMaxLength(nitReceptor, 'El NIT', 20));
     set('nombreReceptor', validateRequired(nombreReceptor, 'El nombre del receptor') ?? validateMaxLength(nombreReceptor, 'El nombre', 150));
     set('idMoneda', validateRequiredSelect(idMoneda, 'una moneda'));
-    set('fechaEmision', validateRequiredDate(fechaEmision, 'La fecha de emisión', { notFuture: true }));
+    set(
+  'fechaEmision',
+  fechaEmision === hoyGuatemalaIso()
+    ? undefined
+    : 'La fecha de emisión debe ser la fecha actual de Guatemala.'
+);
     lineas.forEach((l, i) => {
       const n = i + 1;
       set(`linea${i}.descripcion`, validateRequired(l.descripcion, `La descripción de la línea ${n}`) ?? validateMaxLength(l.descripcion, `La descripción de la línea ${n}`, 200));
@@ -122,7 +140,17 @@ export const FacturaForm = ({ onSuccess, onCancel }: FacturaFormProps) => {
   };
 
   const handleValidar = async () => {
-    if (!isFormValid) { setErrors(validation); return; }
+  if (fechaEmision !== hoyGuatemalaIso()) {
+    setErrors({
+      fechaEmision: 'La fecha cambió. Cierra y vuelve a abrir el formulario.',
+    });
+    return;
+  }
+
+  if (!isFormValid) {
+    setErrors(validation);
+    return;
+  }
     setValidando(true); setFormError(null); setErrors({});
     try {
       setResultadoSat(await apiClient.post<ValidacionSat>('/cxc/facturas/validar', payload(), { successMessage: false }));
@@ -131,8 +159,19 @@ export const FacturaForm = ({ onSuccess, onCancel }: FacturaFormProps) => {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isFormValid) { setErrors(validation); return; }
+  e.preventDefault();
+
+  if (fechaEmision !== hoyGuatemalaIso()) {
+    setErrors({
+      fechaEmision: 'La fecha cambió. Cierra y vuelve a abrir el formulario.',
+    });
+    return;
+  }
+
+  if (!isFormValid) {
+    setErrors(validation);
+    return;
+  }
     setIsSubmitting(true); setFormError(null); setErrors({});
     try {
       const factura = await apiClient.post<FacturaFelDetalle>('/cxc/facturas', payload(), { successMessage: 'Factura certificada correctamente.' });
@@ -170,9 +209,17 @@ export const FacturaForm = ({ onSuccess, onCancel }: FacturaFormProps) => {
         <Select label="Condición de crédito" value={idCondicion} onChange={(e: any) => { setIdCondicion(e.target.value); setResultadoSat(null); }}
           options={[{ value: '', label: 'Contado (vence el mismo día)' }, ...condiciones.map((c) => ({ value: String(c.id), label: c.label }))]}
           placeholder="" helperText="Define la fecha de vencimiento de la cuenta por cobrar." />
-        <TextInput label="Fecha de emisión" type="date" required max={todayIso()} value={fechaEmision}
-          onChange={(e: any) => { setFechaEmision(e.target.value); setResultadoSat(null); }}
-          error={errorFor('fechaEmision', fechaEmision)} helperText="No puede ser una fecha futura." />
+        <TextInput
+  label="Fecha de emisión"
+  type="date"
+  required
+  min={hoyGuatemalaIso()}
+  max={hoyGuatemalaIso()}
+  value={fechaEmision}
+  isReadOnly
+  error={errorFor('fechaEmision', fechaEmision)}
+  helperText="Fecha de emisión: hoy (automática, no editable)."
+/>
       </div>
 
       <div className="flex flex-col gap-3">
