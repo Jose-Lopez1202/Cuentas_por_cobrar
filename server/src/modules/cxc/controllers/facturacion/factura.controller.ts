@@ -1,29 +1,113 @@
-import { Request, Response, NextFunction } from 'express';
+
+import type { Request, Response, NextFunction } from 'express';
+
 import * as service from '../../services/facturacion/factura.service';
+
 import { conEmpleadoActual } from '../../../auth/empleadoActual';
 
-export async function list(req: Request, res: Response, next: NextFunction) {
+// =====================================================
+// LISTAR FACTURAS
+// =====================================================
+
+export async function list(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
   try {
-    res.json(await service.listFacturas({
+    const resultado = await service.listFacturas({
       page: req.query.page as string | undefined,
       limit: req.query.limit as string | undefined,
       search: req.query.search as string | undefined,
-    }));
-  } catch (err) { next(err); }
+    });
+
+    res.json(resultado);
+  } catch (err) {
+    next(err);
+  }
 }
 
-export async function getOne(req: Request, res: Response, next: NextFunction) {
-  try { res.json(await service.getFactura(Number(req.params.id))); } catch (err) { next(err); }
+// =====================================================
+// VALIDAR FACTURA CON SAT SIMULADA
+// =====================================================
+
+export async function validar(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const input = await conEmpleadoActual(req);
+
+    const resultado = await service.validarFacturaSat(input);
+
+    res.json(resultado);
+  } catch (err) {
+    next(err);
+  }
 }
 
-export async function validar(req: Request, res: Response, next: NextFunction) {
-  try { res.json(await service.validarFacturaSat(req.body)); } catch (err) { next(err); }
+// =====================================================
+// EMITIR Y CERTIFICAR FACTURA
+// =====================================================
+
+export async function emitir(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const input = await conEmpleadoActual(req);
+
+    const factura = await service.emitirFactura(input);
+
+    res.status(201).json(factura);
+  } catch (err) {
+    next(err);
+  }
 }
 
-export async function emitir(req: Request, res: Response, next: NextFunction) {
-  try { res.status(201).json(await service.emitirFactura(await conEmpleadoActual(req))); } catch (err) { next(err); }
+// =====================================================
+// OBTENER FACTURA POR ID
+// =====================================================
+
+export async function getOne(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const id = Number(req.params.id);
+
+    const factura = await service.getFactura(id);
+
+    res.json(factura);
+  } catch (err) {
+    next(err);
+  }
 }
 
-export async function anular(req: Request, res: Response, next: NextFunction) {
-  try { res.json(await service.anularFactura(Number(req.params.id), await conEmpleadoActual(req, 'idEmpleadoAnulacion'))); } catch (err) { next(err); }
+// =====================================================
+// ANULAR FACTURA
+// =====================================================
+
+export async function anular(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const id = Number(req.params.id);
+
+    const input = await conEmpleadoActual(
+      req,
+      'idEmpleadoAnulacion',
+    );
+
+    const factura = await service.anularFactura(id, input);
+
+    res.json(factura);
+  } catch (err) {
+    next(err);
+  }
 }

@@ -162,6 +162,14 @@ async function lockYValidarSinAplicaciones(c: oracledb.Connection, id: number, m
   const row = lockResult.rows?.[0];
   if (!row) throw new NotFoundError(`Pago ${id} no encontrado`);
 
+
+  const estadoActual = String(row.ESTADO ?? '').trim().toUpperCase();
+
+if (['ANULADO', 'REVERSADO', 'APLICADO'].includes(estadoActual)) {
+  throw new ConflictError(
+    'El pago está anulado, reversado o aplicado y no puede modificarse directamente.',
+  );
+}
   const sumResult = await c.execute<{ TOTAL: number }>(
     `SELECT NVL(SUM(MONTO_APLICADO), 0) AS TOTAL FROM CXC_APLICACION_PAGOS WHERE ID_PAGO = :id AND ESTADO = 'CONFIRMADA'`,
     { id },
@@ -281,7 +289,16 @@ export async function anular(id: number, input: AnularPagoInput): Promise<void> 
     if (!row) throw new NotFoundError(`Pago ${id} no encontrado`);
 
     const estadoActual = String(row.ESTADO ?? '').trim().toUpperCase();
-    if (estadoActual === 'ANULADO') throw new ConflictError('Este pago ya está anulado.');
+
+if (estadoActual === 'ANULADO') {
+  throw new ConflictError('Este pago ya está anulado.');
+}
+
+if (estadoActual === 'REVERSADO') {
+  throw new ConflictError(
+    'Un pago reversado no puede anularse nuevamente.',
+  );
+}
 
     const aplicadoResult = await c.execute<{ TOTAL: number }>(
       `SELECT NVL(SUM(MONTO_APLICADO), 0) TOTAL

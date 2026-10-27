@@ -45,7 +45,7 @@ export const DocumentoForm = ({ documento, onSuccess, onCancel }: Props) => {
   const [idCondicionCredito, setIdCondicionCredito] = useState(documento?.idCondicionCredito?.toString() ?? '');
   const [serie, setSerie] = useState(documento?.serie ?? '');
   const [numeroDocumento, setNumeroDocumento] = useState(documento?.numeroDocumento ?? '');
-  const [fechaDocumento, setFechaDocumento] = useState(documento?.fechaDocumento?.slice(0, 10) ?? '');
+  const [fechaDocumento] = useState(documento?.fechaDocumento?.slice(0, 10) ?? todayIso());
   const [fechaVencimiento, setFechaVencimiento] = useState(documento?.fechaVencimiento?.slice(0, 10) ?? '');
   const [total, setTotal] = useState(documento?.total?.toString() ?? '');
 
@@ -103,12 +103,19 @@ export const DocumentoForm = ({ documento, onSuccess, onCancel }: Props) => {
       if (numeroErr) next.numeroDocumento = numeroErr;
     }
 
-    const fechaDocumentoErr = validateRequiredDate(fechaDocumento, 'La fecha del documento', {
-      notFuture: true,
-      minDate: BUSINESS_DATE_MIN,
-      maxDate: todayIso(),
-    });
+    const fechaDocumentoErr = validateRequiredDate(
+      fechaDocumento,
+      'La fecha del documento',
+      {
+        minDate: isEditing ? BUSINESS_DATE_MIN : todayIso(),
+        maxDate: isEditing ? BUSINESS_DATE_MAX : todayIso(),
+      },
+    );
     if (fechaDocumentoErr) next.fechaDocumento = fechaDocumentoErr;
+
+    if (!isEditing && fechaDocumento !== todayIso()) {
+      next.fechaDocumento = 'La fecha del documento debe ser la de hoy.';
+    }
 
     const fechaVencimientoErr = validateRequiredDate(fechaVencimiento, 'La fecha de vencimiento', {
       minDate: BUSINESS_DATE_MIN,
@@ -121,7 +128,17 @@ export const DocumentoForm = ({ documento, onSuccess, onCancel }: Props) => {
     if (totalErr) next.total = totalErr;
 
     return next;
-  }, [idCliente, idTipoDocumento, idMoneda, serie, numeroDocumento, fechaDocumento, fechaVencimiento, total]);
+  }, [
+    idCliente,
+    idTipoDocumento,
+    idMoneda,
+    serie,
+    numeroDocumento,
+    fechaDocumento,
+    fechaVencimiento,
+    total,
+    isEditing,
+  ]);
 
   const isFormValid = !hasErrors(validationErrors) && !isLocked;
   const errorFor = (field: string, value?: string) =>
@@ -146,6 +163,14 @@ export const DocumentoForm = ({ documento, onSuccess, onCancel }: Props) => {
       setErrors(validationErrors);
       return;
     }
+
+    if (!isEditing && fechaDocumento !== todayIso()) {
+  setErrors({
+    fechaDocumento:
+      'La fecha del documento debe ser la de hoy. Cierra y vuelve a abrir el formulario.',
+  });
+  return;
+}
 
     setErrors({});
     setIsSubmitting(true);
@@ -276,13 +301,16 @@ export const DocumentoForm = ({ documento, onSuccess, onCancel }: Props) => {
           label="Fecha del documento"
           type="date"
           required
-          min={BUSINESS_DATE_MIN}
-          max={todayIso()}
+          min={isEditing ? BUSINESS_DATE_MIN : todayIso()}
+          max={isEditing ? BUSINESS_DATE_MAX : todayIso()}
           value={fechaDocumento}
-          onChange={(e: any) => setFechaDocumento(e.target.value)}
-          helperText="Fecha de emisión; no puede ser futura."
+          helperText={
+            isEditing
+              ? 'Fecha original del documento (no editable).'
+              : 'Fecha de creación: hoy (automática, no editable).'
+          }
           error={errorFor('fechaDocumento', fechaDocumento)}
-          isReadOnly={isLocked}
+          isReadOnly
         />
         <TextInput
           label="Fecha de vencimiento"

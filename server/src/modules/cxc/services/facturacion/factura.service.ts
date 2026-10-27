@@ -9,6 +9,7 @@ import {
   type ValidacionSat,
 } from '@erp/contracts';
 import { BadRequestError, NotFoundError, SatRechazoError } from '../../../../shared/errors/AppError';
+import { businessTodayIso } from '../../../../shared/date';
 import * as repo from '../../repositories/facturacion/factura.repository';
 import {
   calcularTotales,
@@ -71,11 +72,17 @@ async function evaluar(input: EmitirFacturaInput) {
 
 export async function validarFacturaSat(rawInput: unknown): Promise<ValidacionSat> {
   const input = emitirFacturaSchema.parse(rawInput);
+  if (input.fechaEmision !== businessTodayIso()) {
+    throw new BadRequestError('La fecha de emisión debe ser la fecha actual de Guatemala.');
+  }
   return (await evaluar(input)).validacion;
 }
 
 export async function emitirFactura(rawInput: unknown): Promise<FacturaFelDetalle> {
   const input = emitirFacturaSchema.parse(rawInput);
+  if (input.fechaEmision !== businessTodayIso()) {
+    throw new BadRequestError('La fecha de emisión debe ser la fecha actual de Guatemala.');
+  }
   const ev = await evaluar(input);
   if (!ev.validacion.valida) throw new SatRechazoError(ev.validacion.errores);
 
