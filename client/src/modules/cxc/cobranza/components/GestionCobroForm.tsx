@@ -13,6 +13,7 @@ import {
 } from '../../../../shared/validation';
 import type { CatalogoOption, GestionCobro } from '@erp/contracts';
 import { SearchableSelect } from '../../../../shared/components/SearchableSelect';
+import { CampoUsuarioActual } from '../../../../shared/components/CampoUsuarioActual';
 
 interface GestionCobroFormProps {
   gestion?: GestionCobro | null;
@@ -113,6 +114,7 @@ export const GestionCobroForm = ({ gestion, onSuccess, onCancel }: GestionCobroF
           Al guardar se creará automáticamente una Promesa de Pago vinculada a esta gestión, con esta fecha y monto.
         </p>
       )}
+      {!isEditing && <CampoUsuarioActual />}
       {formError && <p role="alert" className="text-sm text-red-600 font-medium bg-red-50 border border-red-200 rounded-lg px-3 py-2">{formError}</p>}
       <FormActionButtons onCancel={onCancel} isSubmitting={isSubmitting} isEditing={isEditing} createLabel="Crear gestión" isFormValid={isFormValid} blockers={validationErrors} />
     </form>

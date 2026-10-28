@@ -5,6 +5,7 @@ import cxcRoutes from './modules/cxc/routes';
 import authRoutes from './modules/auth/auth.routes';
 import usuariosRoutes from './modules/usuarios/usuarios.routes';
 import { blockIfPasswordChangeRequired, enforceReadOnlyRole, requireAuth } from './modules/auth/auth.middleware';
+import { blindarActor, registrarAcciones } from './modules/auth/accionesAuditoria';
 import { errorHandler, noStore, requestLogger, securityHeaders } from './middlewares';
 import { initOraclePool, closeOraclePool } from './config/database';
 import { config } from './config';
@@ -43,7 +44,7 @@ app.use('/api/auth', noStore, authRoutes);
 
 // Todo CxC exige sesión válida, clave ya cambiada y rol con permiso para la operación.
 app.use('/api/admin/usuarios', noStore, requireAuth, blockIfPasswordChangeRequired, usuariosRoutes);
-app.use('/api/cxc', noStore, requireAuth, blockIfPasswordChangeRequired, enforceReadOnlyRole, cxcRoutes);
+app.use('/api/cxc', noStore, requireAuth, blockIfPasswordChangeRequired, enforceReadOnlyRole, blindarActor, registrarAcciones, cxcRoutes);
 
 app.use(errorHandler);
 

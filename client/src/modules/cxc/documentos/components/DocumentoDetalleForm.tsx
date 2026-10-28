@@ -11,6 +11,7 @@ import {
   type ValidationErrors,
 } from '../../../../shared/validation';
 import type { DocumentoDetalle } from '@erp/contracts';
+import { CampoUsuarioActual } from '../../../../shared/components/CampoUsuarioActual';
 
 interface Props {
   idDocumento: number;
@@ -163,6 +164,7 @@ export const DocumentoDetalleForm = ({ idDocumento, detalle, onSuccess, onCancel
         helperText="Cantidad × precio unitario. Se calcula en el servidor para evitar inconsistencias."
       />
 
+      {!isEditing && <CampoUsuarioActual />}
       {formError && <p className="text-sm text-red-600 font-medium">{formError}</p>}
 
       <FormActionButtons

@@ -10,6 +10,7 @@ import {
   type ValidationErrors,
 } from '../../../../shared/validation';
 import type { DocumentoHistorial } from '@erp/contracts';
+import { CampoUsuarioActual } from '../../../../shared/components/CampoUsuarioActual';
 
 const ESTADOS_DOCUMENTO = ['PENDIENTE', 'PARCIAL', 'PAGADO', 'VENCIDO', 'ANULADO'] as const;
 const estadoOptions = ESTADOS_DOCUMENTO.map((value) => ({
@@ -133,6 +134,7 @@ export const DocumentoHistorialForm = ({
         />
       </div>
 
+      {!isEditing && <CampoUsuarioActual />}
       {formError && <p className="text-sm text-red-600 font-medium">{formError}</p>}
 
       <FormActionButtons

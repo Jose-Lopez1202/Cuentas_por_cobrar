@@ -4,3 +4,4 @@ export { ConfirmDialog } from './ConfirmDialog';
 export { TrazabilidadActionModal } from './TrazabilidadActionModal';
 
 export { AppErrorBoundary } from './AppErrorBoundary';
+export { CampoUsuarioActual } from './CampoUsuarioActual';

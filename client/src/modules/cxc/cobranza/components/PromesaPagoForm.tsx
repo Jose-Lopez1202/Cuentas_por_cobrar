@@ -14,6 +14,7 @@ import {
 } from '../../../../shared/validation';
 import type { CatalogoOption, PromesaPago } from '@erp/contracts';
 import { SearchableSelect } from '../../../../shared/components/SearchableSelect';
+import { CampoUsuarioActual } from '../../../../shared/components/CampoUsuarioActual';
 
 interface PromesaPagoFormProps {
   promesa?: PromesaPago | null;
@@ -493,6 +494,7 @@ export const PromesaPagoForm = ({
         helperText="Detalle adicional; máximo 500 caracteres."
       />
 
+      {!isEditing && <CampoUsuarioActual />}
       {formError && (
         <p
           role="alert"

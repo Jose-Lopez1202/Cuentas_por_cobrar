@@ -14,6 +14,7 @@ import {
 } from '../../../../shared/validation';
 import type { CatalogoOption, FormaPagoOption, Pago } from '@erp/contracts';
 import { SearchableSelect } from '../../../../shared/components/SearchableSelect';
+import { CampoUsuarioActual } from '../../../../shared/components/CampoUsuarioActual';
 
 const REGISTRATION_STATES = [
   { value: 'NO_IDENTIFICADO', label: 'No identificado' },
@@ -286,6 +287,7 @@ export function PagoForm({
         isReadOnly={isLocked}
       />
 
+      {!isEditing && <CampoUsuarioActual />}
       {formError && (
         <p className="text-sm text-red-600 font-medium bg-red-50 border border-red-200 rounded-lg px-3 py-2">
           {formError}

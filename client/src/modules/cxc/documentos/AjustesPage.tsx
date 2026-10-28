@@ -10,6 +10,7 @@ import { formatDateGT } from '../../../shared/date';
 import { hasErrors, validateMaxLength, type ValidationErrors } from '../../../shared/validation';
 import type { Ajuste } from '@erp/contracts';
 import { AjusteForm } from './components/AjusteForm';
+import { CampoUsuarioActual } from '../../../shared/components/CampoUsuarioActual';
 
 const PAGE_SIZE = 10;
 
@@ -99,6 +100,7 @@ function AprobacionModal({
           />
         )}
 
+        <CampoUsuarioActual label="Responsable de la acción" />
         {formError && <p className="text-sm text-red-600 font-medium">{formError}</p>}
 
         <FormActionButtons

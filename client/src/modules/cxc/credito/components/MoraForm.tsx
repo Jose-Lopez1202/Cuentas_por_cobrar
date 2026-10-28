@@ -14,6 +14,7 @@ import {
 } from '../../../../shared/validation';
 import type { CatalogoOption, Mora } from '@erp/contracts';
 import { SearchableSelect } from '../../../../shared/components/SearchableSelect';
+import { CampoUsuarioActual } from '../../../../shared/components/CampoUsuarioActual';
 
 const ESTADO_OPTIONS = [
   { value: 'ACTIVA', label: 'Activa' },
@@ -81,6 +82,7 @@ export const MoraForm = ({ mora, onSuccess, onCancel }: MoraFormProps) => {
       <TextInput label="Fecha de cálculo" type="date" max={todayIso()} value={fechaCalculo} onChange={(e:any)=>setFechaCalculo(e.target.value)} error={errors.fechaCalculo} helperText="No puede ser posterior a hoy." />
       <Select label="Estado" required value={estado} onChange={(e:any)=>setEstado(e.target.value)} options={ESTADO_OPTIONS} error={errors.estado} helperText="Estado controlado del registro de mora." />
     </div>
+    {!isEditing && <CampoUsuarioActual />}
     {formError && <p className="text-sm text-red-600 font-medium bg-red-50 border border-red-200 rounded-lg px-3 py-2">{formError}</p>}
     <FormActionButtons onCancel={onCancel} isSubmitting={isSubmitting} isEditing={isEditing} createLabel="Crear mora" isFormValid={isFormValid} blockers={validate()} />
   </form>;

@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { TextInput, Select } from '../../../../shared/ui-kit';
 import { FormActionButtons } from '../../../../shared/components/FormActionButtons';
 import { apiClient, ApiError } from '../../../../shared/api';
+import { CampoUsuarioActual } from '../../../../shared/components/CampoUsuarioActual';
 
 import {
   hasErrors,
@@ -486,6 +487,7 @@ export function AplicacionPagoForm({
         />
       </div>
 
+      {!isEditing && <CampoUsuarioActual />}
       {formError && (
         <p className="text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
           {formError}

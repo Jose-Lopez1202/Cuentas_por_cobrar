@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { TextArea } from '../ui-kit';
 import { Modal } from './Modal';
+import { CampoUsuarioActual } from './CampoUsuarioActual';
 import { FormActionButtons } from './FormActionButtons';
 import { apiClient, ApiError } from '../api';
 import { hasErrors, type ValidationErrors } from '../validation';
@@ -83,6 +84,8 @@ export function TrazabilidadActionModal({
           error={errors.motivo}
           helperText={motivoHelperText ?? 'Obligatorio, mínimo 10 caracteres.'}
         />
+
+        <CampoUsuarioActual label="Responsable de la acción" />
 
         {formError && <p className="text-sm text-red-600 font-medium">{formError}</p>}
 

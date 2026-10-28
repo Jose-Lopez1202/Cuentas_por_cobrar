@@ -15,6 +15,7 @@ import {
 } from '../../../../shared/validation';
 import type { DocumentoCatalogoOption, FacturaFelDetalle, ValidacionSat } from '@erp/contracts';
 import { SearchableSelect } from '../../../../shared/components/SearchableSelect';
+import { CampoUsuarioActual } from '../../../../shared/components/CampoUsuarioActual';
 
 interface FacturaFormProps {
   onSuccess: (factura: FacturaFelDetalle) => void;
@@ -296,6 +297,7 @@ export const FacturaForm = ({ onSuccess, onCancel }: FacturaFormProps) => {
         )}
       </div>
 
+      <CampoUsuarioActual />
       {formError && <p role="alert" className="text-sm text-red-600 font-medium bg-red-50 border border-red-200 rounded-lg px-3 py-2">{formError}</p>}
 
       <FormActionButtons onCancel={onCancel} isSubmitting={isSubmitting} isFormValid={isFormValid} blockers={validation}

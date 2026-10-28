@@ -12,6 +12,7 @@ import {
 } from '../../../../shared/validation';
 import type { Ajuste, DocumentoCatalogoOption } from '@erp/contracts';
 import { SearchableSelect } from '../../../../shared/components/SearchableSelect';
+import { CampoUsuarioActual } from '../../../../shared/components/CampoUsuarioActual';
 
 const TIPO_OPTIONS = [
   { value: 'DEBITO', label: 'Débito — aumenta el saldo' },
@@ -227,6 +228,7 @@ export const AjusteForm = ({ ajuste, onSuccess, onCancel }: Props) => {
         />
       </div>
 
+      {!isEditing && <CampoUsuarioActual />}
       {formError && <p className="text-sm text-red-600 font-medium">{formError}</p>}
 
       <FormActionButtons
